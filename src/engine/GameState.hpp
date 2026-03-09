@@ -4,6 +4,19 @@
 
 enum class Player { NONE = 0, BLACK = 1, WHITE = 2 };
 
+/*
+si Bitboard V2 est implémenté
+
+struct GameState {
+    // 0 = vide, 1 = Noir, 2 = Blanc
+    // Plateau 1D permet de faire des accès avec cache l1 optimisé : `board[y *
+19 + x]` uint8_t board[361] = {0}; Player current_player = Player::BLACK; int
+black_captures = 0; int white_captures = 0;
+    // ...
+};
+
+*/
+
 struct GameState {
   Bitboard black_board;
   Bitboard white_board;
