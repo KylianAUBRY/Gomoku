@@ -1,7 +1,11 @@
-#include "../include/gomoku.h"
+#include "engine/GameState.hpp"
+#include "front/GameUI.hpp"
 
-int main()
-{
-    printf("Hello, Gomoku!\n");
-    return 0;
+int main() {
+  GameState state;
+  GameUI ui;
+
+  ui.run(state);
+
+  return 0;
 }

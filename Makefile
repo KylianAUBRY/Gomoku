@@ -1,32 +1,37 @@
-NAME	=	gomoku
+# Compiler
+CXX = g++
+CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -O3
 
-SRCS	=	src/main.cpp	\
-			src/error.cpp \
-			src/utils.cpp \
-			src/algo.cpp \
-			src/front.cpp 
+# Include & libraries (assuming homebrew standard location for SFML on mac)
+# If SFML is installed differently, paths will need adjustment.
+INCLUDES = -I/opt/homebrew/include -I./src
+LIBS = -L/opt/homebrew/lib -lsfml-graphics -lsfml-window -lsfml-system
 
-		
-OBJ =	${SRCS:.c=.o}
+# Binary
+NAME = Gomoku
 
-CC =	cpp
+# Sources
+SRCS = src/main.cpp \
+       src/front/GameUI.cpp \
+       src/front/Input.cpp \
+       src/engine/Rules.cpp
 
-CFLAGS	=	 -Wall -Wextra -Werror -g #-fsanitize=address
+OBJS = $(SRCS:.cpp=.o)
 
-.c.o:
-			$(CC) $(CFLAGS) -c $< -o $(<:.c=.o)
+all: $(NAME)
 
-$(NAME): ${OBJ}
-		$(CC) $(CFLAGS) -o $(NAME) ${OBJ}
+$(NAME): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $(NAME) $(OBJS) $(LIBS)
 
-all:	${NAME}
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
-		rm -f ${OBJ}
+	rm -f $(OBJS)
 
-fclean:	clean
-		rm -f ${NAME}
+fclean: clean
+	rm -f $(NAME)
 
-re:	fclean all
+re: fclean all
 
 .PHONY: all clean fclean re
