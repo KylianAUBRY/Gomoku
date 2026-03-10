@@ -1,47 +1,52 @@
 #pragma once
 
-#include "Bitboard.hpp"
+#include "../Gomoku.hpp"
 
-enum class Player { NONE = 0, BLACK = 1, WHITE = 2 };
-
-/*
-si Bitboard V2 est implémenté
-
-struct GameState {
-    // 0 = vide, 1 = Noir, 2 = Blanc
-    // Plateau 1D permet de faire des accès avec cache l1 optimisé : `board[y *
-19 + x]` uint8_t board[361] = {0}; Player current_player = Player::BLACK; int
-black_captures = 0; int white_captures = 0;
-    // ...
+enum class Player
+{
+    NONE = 0,
+    BLACK = 1,
+    WHITE = 2
 };
 
-*/
+struct GameState
+{
+    BitBoard board;
+    Player current_player = Player::BLACK;
 
-struct GameState {
-  Bitboard black_board;
-  Bitboard white_board;
-  Player current_player = Player::BLACK;
+    int black_captures = 0;
+    int white_captures = 0;
+    bool game_over = false;
 
-  int black_captures = 0;
-  int white_captures = 0;
-
-  inline bool is_empty(int x, int y) const {
-    return !black_board.get_bit(x, y) && !white_board.get_bit(x, y);
-  }
-
-  // Places a stone. Returns true if successful, false if invalid/occupied.
-  inline bool place_stone(int x, int y) {
-    if (x < 0 || x >= 19 || y < 0 || y >= 19 || !is_empty(x, y)) {
-      return false; // Invalid move
+    void reset()
+    {
+        board = BitBoard(); // Clear board
+        current_player = Player::BLACK;
+        black_captures = 0;
+        white_captures = 0;
+        game_over = false;
     }
 
-    if (current_player == Player::BLACK) {
-      black_board.set_bit(x, y);
-      current_player = Player::WHITE;
-    } else {
-      white_board.set_bit(x, y);
-      current_player = Player::BLACK;
+    inline bool is_empty(int x, int y) const { return board.isEmpty(y, x); }
+
+    // Places a stone. Returns true if successful, false if invalid/occupied.
+    inline bool place_stone(int x, int y)
+    {
+        if (x < 0 || x >= 19 || y < 0 || y >= 19 || !is_empty(x, y))
+        {
+            return false; // Invalid move
+        }
+
+        if (current_player == Player::BLACK)
+        {
+            board.set(y, x, BLACK);
+            current_player = Player::WHITE;
+        }
+        else
+        {
+            board.set(y, x, WHITE);
+            current_player = Player::BLACK;
+        }
+        return true;
     }
-    return true;
-  }
 };
