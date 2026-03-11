@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Gomoku.hpp"
+#include "Gomoku.hpp"
 
 enum class Player { NONE = 0, BLACK = 1, WHITE = 2 };
 

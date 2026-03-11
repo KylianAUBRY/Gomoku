@@ -15,7 +15,7 @@ SRCS = src/main.cpp \
        src/front/GameUI.cpp \
        src/front/Input.cpp \
        src/engine/Rules.cpp \
-	   src/Gomoku.cpp
+	   src/engine/Gomoku.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 
