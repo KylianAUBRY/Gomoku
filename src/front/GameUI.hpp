@@ -6,9 +6,9 @@
 enum class UIState { MAIN_MENU, PLAYING_SOLO, PLAYING_MULTI };
 
 // Layout constants
-static constexpr float CELL_SIZE = 40.0f;
+static constexpr float CELL_SIZE = 35.0f;
 static constexpr int BOARD_SIZE = 19;
-static constexpr float MARGIN = 50.0f;
+static constexpr float MARGIN = 45.0f;
 
 class GameUI {
 public:

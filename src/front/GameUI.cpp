@@ -6,7 +6,8 @@
 GameUI::GameUI()
     : window(sf::VideoMode(
                  {(unsigned int)((BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN),
-                  (unsigned int)((BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN)}),
+                  (unsigned int)((BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN +
+                                 100)}), // +100 for bottom HUD bar
              "Gomoku - Local PvP") {
   window.setFramerateLimit(60);
   current_state = UIState::MAIN_MENU;
@@ -83,7 +84,7 @@ void GameUI::render(const GameState &state) {
 }
 
 void GameUI::draw_board() {
-  // Draw grid
+  // Draw grid lines
   sf::RectangleShape line(sf::Vector2f((BOARD_SIZE - 1) * CELL_SIZE, 2));
   line.setFillColor(sf::Color::Black);
 
@@ -92,11 +93,57 @@ void GameUI::draw_board() {
     line.setPosition({(float)MARGIN, (float)(MARGIN + i * CELL_SIZE - 1)});
     window.draw(line);
 
-    // Vertical (rotate)
+    // Vertical
     sf::RectangleShape vline(sf::Vector2f(2, (BOARD_SIZE - 1) * CELL_SIZE));
     vline.setFillColor(sf::Color::Black);
     vline.setPosition({(float)(MARGIN + i * CELL_SIZE - 1), (float)MARGIN});
     window.draw(vline);
+  }
+
+  // Draw coordinates
+  // X axis: Letters (A-T, skipping I)
+  // Y axis: Numbers (1-19 or 19-1) - we use 1-19 top to bottom here
+  for (int i = 0; i < BOARD_SIZE; ++i) {
+    // Column Letter
+    char col_char = 'A' + i;
+    if (col_char >= 'I')
+      col_char++; // Skip 'I'
+    std::string col_str(1, col_char);
+
+    sf::Text col_text_top(font, col_str, 18);
+    col_text_top.setFillColor(sf::Color::Black);
+    col_text_top.setPosition(
+        {(float)(MARGIN + i * CELL_SIZE -
+                 col_text_top.getGlobalBounds().size.x / 2.0f),
+         (float)(MARGIN - 30.0f)});
+    window.draw(col_text_top);
+
+    sf::Text col_text_bot(font, col_str, 18);
+    col_text_bot.setFillColor(sf::Color::Black);
+    col_text_bot.setPosition(
+        {(float)(MARGIN + i * CELL_SIZE -
+                 col_text_bot.getGlobalBounds().size.x / 2.0f),
+         (float)(MARGIN + (BOARD_SIZE - 1) * CELL_SIZE + 10.0f)});
+    window.draw(col_text_bot);
+
+    // Row Number
+    std::string row_str =
+        std::to_string(i + 1); // 1 to 19 (or 19 to 1 if you prefer inverted)
+
+    sf::Text row_text_left(font, row_str, 18);
+    row_text_left.setFillColor(sf::Color::Black);
+    row_text_left.setPosition(
+        {(float)(MARGIN - 30.0f -
+                 row_text_left.getGlobalBounds().size.x / 2.0f),
+         (float)(MARGIN + i * CELL_SIZE - 12.0f)});
+    window.draw(row_text_left);
+
+    sf::Text row_text_right(font, row_str, 18);
+    row_text_right.setFillColor(sf::Color::Black);
+    row_text_right.setPosition(
+        {(float)(MARGIN + (BOARD_SIZE - 1) * CELL_SIZE + 15.0f),
+         (float)(MARGIN + i * CELL_SIZE - 12.0f)});
+    window.draw(row_text_right);
   }
 }
 
@@ -123,47 +170,59 @@ void GameUI::draw_stones(const GameState &state) {
 }
 
 void GameUI::draw_hud(const GameState &state) {
+  float hud_y = (BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN; // Start of HUD area
+  float hud_height = 100.0f;
+
+  // Background banner
+  sf::RectangleShape hud_bg(sf::Vector2f(window.getSize().x, hud_height));
+  hud_bg.setFillColor(sf::Color(40, 40, 40)); // Dark grey
+  hud_bg.setPosition({0, hud_y});
+  window.draw(hud_bg);
+
+  // Left: Mode Info
   sf::Text info(font,
                 current_state == UIState::PLAYING_SOLO
                     ? "Mode Solo - Esc to Quit"
                     : "Mode Multi - Esc to Quit",
                 20);
   info.setFillColor(sf::Color::White);
-  info.setPosition({10, 10});
+  info.setPosition({20.0f, hud_y + 15.0f});
   window.draw(info);
 
-  // Draw Captures
+  // Left (below info): AI Timer
+  if (current_state == UIState::PLAYING_SOLO) {
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "AI Time: %.2f ms",
+             state.last_ai_move_time_ms);
+    sf::Text timer_text(font, buffer, 18);
+    timer_text.setFillColor(sf::Color::Cyan); // Distinct color for timer
+    timer_text.setPosition({20.0f, hud_y + 55.0f});
+    window.draw(timer_text);
+  }
+
+  // Center: Current turn
+  std::string turn_str = "Tour : ";
+  turn_str += (state.current_player == Player::BLACK) ? "NOIR" : "BLANC";
+  sf::Text turn_text(font, turn_str, 24);
+  turn_text.setFillColor(state.current_player == Player::BLACK
+                             ? sf::Color::Black
+                             : sf::Color::White);
+  // Add a slight outline for visibility on dark gray if needed, but it should
+  // be fine here.
+  turn_text.setPosition(
+      {window.getSize().x / 2.0f - turn_text.getGlobalBounds().size.x / 2.0f,
+       hud_y + 35.0f});
+  window.draw(turn_text);
+
+  // Right: Captures
   sf::Text captures_text(
       font,
       "Captures (B: " + std::to_string(state.black_captures) +
           " | W: " + std::to_string(state.white_captures) + ")",
       20);
   captures_text.setFillColor(sf::Color::White);
-  captures_text.setPosition({window.getSize().x - 220.0f, 10.0f});
+  captures_text.setPosition({window.getSize().x - 220.0f, hud_y + 35.0f});
   window.draw(captures_text);
-
-  // Draw Current turn
-  std::string turn_str = "Tour : ";
-  turn_str += (state.current_player == Player::BLACK) ? "NOIR" : "BLANC";
-  sf::Text turn_text(font, turn_str, 20);
-  turn_text.setFillColor(state.current_player == Player::BLACK
-                             ? sf::Color::Black
-                             : sf::Color::White);
-  turn_text.setPosition(
-      {window.getSize().x / 2.0f - turn_text.getGlobalBounds().size.x / 2.0f,
-       10.0f});
-  window.draw(turn_text);
-
-  // Draw AI Timer (Only in Solo mode)
-  if (current_state == UIState::PLAYING_SOLO) {
-    char buffer[64];
-    snprintf(buffer, sizeof(buffer), "AI Time: %.2f ms",
-             state.last_ai_move_time_ms);
-    sf::Text timer_text(font, buffer, 20);
-    timer_text.setFillColor(sf::Color::Cyan); // Distinct color for timer
-    timer_text.setPosition({10.0f, window.getSize().y - 30.0f});
-    window.draw(timer_text);
-  }
 }
 
 void GameUI::draw_game_over(const GameState &state) {
