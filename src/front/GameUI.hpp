@@ -9,6 +9,7 @@ enum class UIState { MAIN_MENU, PLAYING_SOLO, PLAYING_MULTI };
 static constexpr float CELL_SIZE = 35.0f;
 static constexpr int BOARD_SIZE = 19;
 static constexpr float MARGIN = 45.0f;
+static constexpr float HISTORY_WIDTH = 250.0f;
 
 class GameUI {
 public:
@@ -36,4 +37,5 @@ private:
   void draw_stones(const GameState &state);
   void draw_hud(const GameState &state);
   void draw_game_over(const GameState &state);
+  void draw_history(const GameState &state);
 };

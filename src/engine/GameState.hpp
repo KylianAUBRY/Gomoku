@@ -1,8 +1,16 @@
 #pragma once
 
 #include "Gomoku.hpp"
+#include <vector>
 
 enum class Player { NONE = 0, BLACK = 1, WHITE = 2 };
+
+struct GameMove {
+  Player player;
+  int x;
+  int y;
+  int turn;
+};
 
 struct GameState {
   BitBoard board;
@@ -13,6 +21,9 @@ struct GameState {
   bool game_over = false;
 
   double last_ai_move_time_ms = 0.0;
+  int current_turn = 1;
+
+  std::vector<GameMove> move_history;
 
   void reset() {
     board = BitBoard(); // Clear board
@@ -21,6 +32,8 @@ struct GameState {
     white_captures = 0;
     game_over = false;
     last_ai_move_time_ms = 0.0;
+    current_turn = 1;
+    move_history.clear();
   }
 
   inline bool is_empty(int x, int y) const { return board.isEmpty(y, x); }
@@ -38,6 +51,11 @@ struct GameState {
       board.set(y, x, WHITE);
       current_player = Player::BLACK;
     }
+
+    move_history.push_back(
+        {current_player == Player::BLACK ? Player::WHITE : Player::BLACK, x, y,
+         current_turn});
+    current_turn++;
     return true;
   }
 };

@@ -5,7 +5,8 @@
 
 GameUI::GameUI()
     : window(sf::VideoMode(
-                 {(unsigned int)((BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN),
+                 {(unsigned int)((BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN +
+                                 HISTORY_WIDTH),
                   (unsigned int)((BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN +
                                  100)}), // +100 for bottom HUD bar
              "Gomoku - Local PvP") {
@@ -74,6 +75,7 @@ void GameUI::render(const GameState &state) {
   if (current_state == UIState::PLAYING_SOLO ||
       current_state == UIState::PLAYING_MULTI) {
     draw_hud(state);
+    draw_history(state);
 
     if (state.game_over) {
       draw_game_over(state);
@@ -201,14 +203,18 @@ void GameUI::draw_hud(const GameState &state) {
   }
 
   // Center: Current turn
-  std::string turn_str = "Tour : ";
+  std::string turn_str = "Tour " + std::to_string(state.current_turn) + " : ";
   turn_str += (state.current_player == Player::BLACK) ? "NOIR" : "BLANC";
   sf::Text turn_text(font, turn_str, 24);
-  turn_text.setFillColor(state.current_player == Player::BLACK
-                             ? sf::Color::Black
-                             : sf::Color::White);
-  // Add a slight outline for visibility on dark gray if needed, but it should
-  // be fine here.
+
+  if (state.current_player == Player::BLACK) {
+    turn_text.setFillColor(sf::Color::Black);
+    turn_text.setOutlineColor(sf::Color::White);
+    turn_text.setOutlineThickness(1.0f);
+  } else {
+    turn_text.setFillColor(sf::Color::White);
+  }
+
   turn_text.setPosition(
       {window.getSize().x / 2.0f - turn_text.getGlobalBounds().size.x / 2.0f,
        hud_y + 35.0f});
@@ -263,4 +269,68 @@ void GameUI::draw_game_over(const GameState &state) {
       {window.getSize().x / 2.0f - replay_txt.getGlobalBounds().size.x / 2.0f,
        window.getSize().y / 2.0f + 30});
   window.draw(replay_txt);
+}
+
+void GameUI::draw_history(const GameState &state) {
+  float hist_x = (BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN;
+  float hist_width = HISTORY_WIDTH;
+  float hist_height = window.getSize().y;
+
+  // Background for history panel
+  sf::RectangleShape hist_bg(sf::Vector2f(hist_width, hist_height));
+  hist_bg.setFillColor(sf::Color(50, 50, 50));
+  hist_bg.setPosition({hist_x, 0});
+  window.draw(hist_bg);
+
+  // Title
+  sf::Text title(font, "Historique", 26);
+  title.setFillColor(sf::Color::White);
+  title.setStyle(sf::Text::Underlined | sf::Text::Bold);
+  title.setPosition({hist_x + 10.0f, 10.0f});
+  window.draw(title);
+
+  // Render recent moves (last 23)
+  size_t display_count = 23;
+  size_t start_idx = 0;
+  if (state.move_history.size() > display_count) {
+    start_idx = state.move_history.size() - display_count;
+  }
+
+  float y_offset = 60.0f;
+  float radius = 10.0f;
+  sf::CircleShape stone(radius);
+  stone.setOrigin({radius, radius});
+
+  for (size_t i = start_idx; i < state.move_history.size(); ++i) {
+    const GameMove &mv = state.move_history[i];
+
+    // Stone icon
+    stone.setPosition({hist_x + 20.0f, y_offset + 10.0f});
+    if (mv.player == Player::BLACK) {
+      stone.setFillColor(sf::Color::Black);
+      stone.setOutlineColor(sf::Color::White);
+      stone.setOutlineThickness(1.0f);
+    } else {
+      stone.setFillColor(sf::Color::White);
+      stone.setOutlineThickness(0.0f);
+    }
+    window.draw(stone);
+
+    // X/Y formatted (Letter and Number based on grid display)
+    char col_char = 'A' + mv.x;
+    if (col_char >= 'I')
+      col_char++; // Skip 'I' for display
+    std::string coord_str =
+        std::string(1, col_char) + "-" + std::to_string(mv.y + 1);
+
+    // Text: Tour N : x-y
+    std::string line_str =
+        "Tour " + std::to_string(mv.turn) + " : " + coord_str;
+    sf::Text line_text(font, line_str, 18);
+    line_text.setFillColor(sf::Color::White);
+    line_text.setPosition({hist_x + 40.0f, y_offset});
+    window.draw(line_text);
+
+    y_offset += 30.0f;
+  }
 }
