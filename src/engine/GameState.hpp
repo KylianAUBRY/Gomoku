@@ -23,6 +23,8 @@ struct GameState {
   double last_ai_move_time_ms = 0.0;
   int current_turn = 1;
 
+  Move best_move_suggestion = {-1, -1, 0, 0};
+
   std::vector<GameMove> move_history;
 
   void reset() {
@@ -33,6 +35,7 @@ struct GameState {
     game_over = false;
     last_ai_move_time_ms = 0.0;
     current_turn = 1;
+    best_move_suggestion = {-1, -1, 0, 0};
     move_history.clear();
   }
 

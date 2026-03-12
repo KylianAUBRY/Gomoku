@@ -19,11 +19,11 @@ GameUI::GameUI()
   }
 }
 
-void GameUI::run(GameState &state) {
+void GameUI::run(GameState &state, Gomoku &gomoku) {
   while (window.isOpen()) {
 
     // Delegate all input logic to Input module
-    Input::process_events(window, current_state, menu_selection, state);
+    Input::process_events(window, current_state, menu_selection, state, gomoku);
 
     // Rendering phase
     if (current_state == UIState::MAIN_MENU) {
@@ -74,6 +74,7 @@ void GameUI::render(const GameState &state) {
 
   if (current_state == UIState::PLAYING_SOLO ||
       current_state == UIState::PLAYING_MULTI) {
+    draw_best_move(state);
     draw_hud(state);
     draw_history(state);
 
@@ -333,4 +334,27 @@ void GameUI::draw_history(const GameState &state) {
 
     y_offset += 30.0f;
   }
+}
+
+void GameUI::draw_best_move(const GameState &state) {
+  if (state.game_over)
+    return;
+  if (state.best_move_suggestion.row < 0 || state.best_move_suggestion.col < 0)
+    return;
+
+  float radius = CELL_SIZE * 0.4f;
+  sf::CircleShape ghost(radius);
+  ghost.setOrigin({radius, radius});
+
+  // Semi-transparent color matching the current player
+  if (state.current_player == Player::BLACK) {
+    ghost.setFillColor(sf::Color(0, 0, 0, 100));
+  } else {
+    ghost.setFillColor(sf::Color(255, 255, 255, 100));
+  }
+
+  ghost.setPosition(
+      {(float)(MARGIN + state.best_move_suggestion.col * CELL_SIZE),
+       (float)(MARGIN + state.best_move_suggestion.row * CELL_SIZE)});
+  window.draw(ghost);
 }
