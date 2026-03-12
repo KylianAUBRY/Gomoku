@@ -48,10 +48,10 @@ struct GameState {
     }
 
     if (current_player == Player::BLACK) {
-      board.set(y, x, BLACK);
+      makeMove(board, {y, x, 0, 0}, BLACK);
       current_player = Player::WHITE;
     } else {
-      board.set(y, x, WHITE);
+      makeMove(board, {y, x, 0, 0}, WHITE);
       current_player = Player::BLACK;
     }
 
