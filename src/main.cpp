@@ -167,7 +167,14 @@ void initEvalTable() {
       }
     }
     // ici seron traiter les paterne exeptionelle
-
+    if(line[4] == 1 && line[5] == 2 && line[6] == 2 && line[7] == 1)
+      score += 30000;
+    if(line[4] == 1 && line[3] == 2 && line[2] == 2 && line[1] == 1)
+        score -= 30000;
+    if(line[4] == 2 && line[5] == 1 && line[6] == 1 && line[7] == 2)
+      score += -30000;
+    if(line[4] == 2 && line[3] == 1 && line[2] == 1 && line[1] == 2)
+        score -= -30000;
     evalTable[i] = score;
   }
 }

@@ -278,9 +278,9 @@ Move Gomoku::getBestMove(BitBoard& board, Cell player) {
     Move bestMove = minimax(0, board, player);
     clock_gettime(CLOCK_MONOTONIC, &end);
 
-  double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
+    double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
                    (end.tv_nsec - start.tv_nsec) / 1e6;
-  printf("get_best_move: %.3f ms, move.score : %d, board.score : %d\n", elapsed, bestMove.score, board.score);
+    printf("get_best_move: %.3f ms, move.score : %d, board.score : %d\n", elapsed, bestMove.score, board.score);
   
     return bestMove;
 }
