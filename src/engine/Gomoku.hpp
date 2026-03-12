@@ -67,8 +67,11 @@ public:
 
     Move getBestMove(BitBoard& board, Cell player);
     bool isLegalMove(const BitBoard& board, int row, int col, Cell player);
+    
 
 private:
     std::vector<Move> generateMoves(const BitBoard& board, Cell player);
     Move minimax(int depth, BitBoard& board, Cell player);
 };
+
+void makeMove(BitBoard& board, const Move& move, Cell player);

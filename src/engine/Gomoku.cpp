@@ -202,7 +202,7 @@ static int computeLineScore(const BitBoard& board, int row, int col, int dr, int
     return evalTable[code];
 }
 
-static void makeMove(BitBoard& board, const Move& move, Cell player) {
+void makeMove(BitBoard& board, const Move& move, Cell player) {
     // int scoreBefore = board.score;
     int pos = idx(move.row, move.col);
     board.score -= computeLineScore(board, move.row, move.col, 0,  1);
