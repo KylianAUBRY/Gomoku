@@ -176,6 +176,8 @@ void initEvalTable() {
     if(line[4] == 2 && line[3] == 1 && line[2] == 1 && line[1] == 2)
         score -= -30000;
     evalTable[i] = score;
+
+    //prendre en compte les patternes exceptionelle avec notament le evalTab[i][2] 
   }
 }
 
