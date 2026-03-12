@@ -144,6 +144,7 @@ static int countFreeThrees(const BitBoard& board, int row, int col, Cell player)
 }
 
 bool Gomoku::isLegalMove(const BitBoard& board, int row, int col, Cell player) {
+    return true;
     if (!isEmpty(board, row, col))
         return false;
 
@@ -241,9 +242,11 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
     if (player == WHITE) {
         Move best = {-1, -1, std::numeric_limits<int>::min(), 0};
         for (const Move& move : moves) {
+            int scoreBefore = board.score;
             makeMove(board, move, WHITE);
             Move eval = minimax(depth + 1, board, opponent);
             undoMove(board, move, WHITE);
+            board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
             if (eval.score > best.score) {
                 best = {move.row, move.col, eval.score, 0};
             }
@@ -252,9 +255,11 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
     } else {
         Move best = {-1, -1, std::numeric_limits<int>::max(), 0};
         for (const Move& move : moves) {
+            int scoreBefore = board.score;
             makeMove(board, move, BLACK);
             Move eval = minimax(depth + 1, board, opponent);
             undoMove(board, move, BLACK);
+            board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
             if (eval.score < best.score) {
                 best = {move.row, move.col, eval.score, 0};
             }
@@ -266,8 +271,16 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
 
 Move Gomoku::getBestMove(BitBoard& board, Cell player) {
     // TODO : implémenter minimax avec évaluation heuristique
+  struct timespec start, end;
+
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
     Move bestMove = minimax(0, board, player);
+    clock_gettime(CLOCK_MONOTONIC, &end);
 
+  double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
+                   (end.tv_nsec - start.tv_nsec) / 1e6;
+  printf("get_best_move: %.3f ms, move.score : %d, board.score : %d\n", elapsed, bestMove.score, board.score);
+  
     return bestMove;
 }

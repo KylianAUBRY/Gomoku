@@ -35,7 +35,9 @@ static Pattern patterns_white[] = {
     {{0, 1, 1, 3}, 4, 80},
     {{3, 1, 0, 1, 0}, 5, 40},
     {{0, 1, 0, 1, 3}, 5, 40},
-    {{0, 1, 0}, 3, 15},
+    {{0, 1, 0}, 3, 20},
+    {{3, 1, 0}, 3, 10},
+    {{0, 1, 3}, 3, 10},
     {{3, 1, 1, 3}, 4, 10},
     {{3, 1, 1, 1, 3}, 5, 50},
     {{3, 1, 1, 1, 1, 3}, 6, 100},
@@ -63,7 +65,9 @@ static Pattern patterns_black[] = {
     {{0, 2, 2, 3}, 4, -80},
     {{3, 2, 0, 2, 0}, 5, -40},
     {{0, 2, 0, 2, 3}, 5, -40},
-    {{0, 2, 0}, 3, -15},
+    {{0, 2, 0}, 3, -20},
+    {{3, 2, 0}, 3, -10},
+    {{0, 2, 3}, 3, -10},
     {{3, 2, 2, 3}, 4, -10},
     {{3, 2, 2, 2, 3}, 5, -50},
     {{3, 2, 2, 2, 2, 3}, 6, -100},
@@ -169,15 +173,8 @@ void initEvalTable() {
 }
 
 int main() {
-  struct timespec start, end;
-
-  clock_gettime(CLOCK_MONOTONIC, &start);
   initEvalTable();
-  clock_gettime(CLOCK_MONOTONIC, &end);
 
-  double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
-                   (end.tv_nsec - start.tv_nsec) / 1e6;
-  printf("initEvalTable: %.3f ms\n", elapsed);
 
   Gomoku game;
   GameState state;

@@ -6,7 +6,7 @@
 
 constexpr int SIZE = 19;
 constexpr int DEPTH_LIMIT = 3;
-constexpr int RANGE = 2;
+constexpr int RANGE = 1;
 constexpr int BitBoard_SIZE = 6; // ceil(19*19 / 64) = 6
 
 extern int evalTable[262144];
