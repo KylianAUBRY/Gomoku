@@ -9,7 +9,7 @@ constexpr int DEPTH_LIMIT = 10;
 constexpr int RANGE = 2;
 constexpr int BitBoard_SIZE = 6; // ceil(19*19 / 64) = 6
 
-extern int16_t evalTable[19683];
+extern int evalTable[262144];
 
 
 enum Cell {

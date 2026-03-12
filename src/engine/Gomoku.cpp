@@ -197,6 +197,9 @@ std::vector<Move> Gomoku::generateMoves(const BitBoard& board, const Cell player
 
 static void makeMove(BitBoard& board, const Move& move, Cell player) {
     int pos = idx(move.row, move.col);
+//ici
+
+
     if (player == WHITE)
         setBit(board.white, pos);
     else
