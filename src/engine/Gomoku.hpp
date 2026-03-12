@@ -5,7 +5,7 @@
 #include <cstdint>
 
 constexpr int SIZE = 19;
-constexpr int DEPTH_LIMIT = 10;
+constexpr int DEPTH_LIMIT = 3;
 constexpr int RANGE = 2;
 constexpr int BitBoard_SIZE = 6; // ceil(19*19 / 64) = 6
 
@@ -22,6 +22,7 @@ enum Cell {
 struct BitBoard {
     uint64_t black[BitBoard_SIZE] = {};
     uint64_t white[BitBoard_SIZE] = {};
+    int score = 0;
 
     // Retourne la cellule à (row, col)
     Cell get(int row, int col) const {
@@ -64,7 +65,7 @@ public:
 
     Gomoku();
 
-    Move getBestMove(const BitBoard& board, Cell player);
+    Move getBestMove(BitBoard& board, Cell player);
     bool isLegalMove(const BitBoard& board, int row, int col, Cell player);
 
 private:

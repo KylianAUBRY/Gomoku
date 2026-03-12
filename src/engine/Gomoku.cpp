@@ -57,18 +57,6 @@ Gomoku::Gomoku() {
     }
 }
 
-static int evaluate(const BitBoard& board, Cell player) {
-    // TODO: évaluation heuristique
-    (void) board; (void) player;
-    return 0;
-}
-
-Move Gomoku::getBestMove(const BitBoard& board, Cell player) {
-    // TODO : implémenter minimax avec évaluation heuristique
-    (void) board; (void) player;
-    return {SIZE / 2, SIZE / 2, 0, 0};
-}
-
 // Vérifie si une séquence de cases (donnée par ses positions) forme un free-three :
 // les formes valides sont _XXX_ , _XX_X_ , _X_XX_
 static int countFreeThrees(const BitBoard& board, int row, int col, Cell player) {
@@ -195,15 +183,44 @@ std::vector<Move> Gomoku::generateMoves(const BitBoard& board, const Cell player
     return moves;
 }
 
-static void makeMove(BitBoard& board, const Move& move, Cell player) {
-    int pos = idx(move.row, move.col);
-//ici
+static int computeLineScore(const BitBoard& board, int row, int col, int dr, int dc) {
+    int code = 0;
+    for (int i = 0; i < 9; i++) {
+        int r = row + ((i - 4) * dr);
+        int c = col + ((i - 4) * dc);
+        int val;
+        if (r < 0 || r >= SIZE || c < 0 || c >= SIZE)
+            val = 3; // hors-plateau = blockage
+        else {
+            int pos = idx(r, c);
+            if      (getBit(board.white, pos)) val = 1;
+            else if (getBit(board.black, pos)) val = 2;
+            else                               val = 0;
+        }
+        code = code * 4 + val;
+    }
+    return evalTable[code];
+}
 
+static void makeMove(BitBoard& board, const Move& move, Cell player) {
+    // int scoreBefore = board.score;
+    int pos = idx(move.row, move.col);
+    board.score -= computeLineScore(board, move.row, move.col, 0,  1);
+    board.score -= computeLineScore(board, move.row, move.col, 1,  0);
+    board.score -= computeLineScore(board, move.row, move.col, 1,  1);
+    board.score -= computeLineScore(board, move.row, move.col, 1, -1);
 
     if (player == WHITE)
         setBit(board.white, pos);
     else
         setBit(board.black, pos);
+    
+    board.score += computeLineScore(board, move.row, move.col, 0,  1);
+    board.score += computeLineScore(board, move.row, move.col, 1,  0);
+    board.score += computeLineScore(board, move.row, move.col, 1,  1);
+    board.score += computeLineScore(board, move.row, move.col, 1, -1);
+
+    // return board.score - scoreBefore;
 }
 
 static void undoMove(BitBoard& board, const Move& move, Cell player) {
@@ -216,7 +233,7 @@ static void undoMove(BitBoard& board, const Move& move, Cell player) {
 
 Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
     if (depth > DEPTH_LIMIT)
-        return {-1, -1, evaluate(board, player), 0};
+        return {-1, -1, board.score, 0};
 
     std::vector<Move> moves = generateMoves(board, player);
     Cell opponent = (player == WHITE) ? BLACK : WHITE;
@@ -244,4 +261,13 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
         }
         return best;
     }
+}
+
+
+Move Gomoku::getBestMove(BitBoard& board, Cell player) {
+    // TODO : implémenter minimax avec évaluation heuristique
+
+    Move bestMove = minimax(0, board, player);
+
+    return bestMove;
 }
