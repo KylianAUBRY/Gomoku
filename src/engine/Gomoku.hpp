@@ -11,21 +11,29 @@ constexpr int BitBoard_SIZE = 6; // ceil(19*19 / 64) = 6
 
 extern int evalTable[262144][2];
 
-// evalTable[i][1] layout (compteurs sur 3 bits chacun):
-// bits  0-2 : nb captures blanches (blanc joue, noir capturé : 1,2,2,1)
-// bits  3-5 : nb captures noires   (noir joue, blanc capturé : 2,1,1,2)
-// bits  6-8 : nb free-three blancs
-// bits  9-11: nb free-three noirs
+#define MANUAL_CAPTURE_SCORE 15000
 
-#define GET_WHITE_CAPTURES(f)  (((f) >> 0) & 0x7)
-#define GET_BLACK_CAPTURES(f)  (((f) >> 3) & 0x7)
-#define GET_WHITE_THREES(f)    (((f) >> 6) & 0x7)
-#define GET_BLACK_THREES(f)    (((f) >> 9) & 0x7)
+// evalTable[i][1] layout:
+// bit 0 : capture blanche vers le haut  (1,2,2,1 à droite du centre)
+// bit 1 : capture blanche vers le bas   (1,2,2,1 à gauche du centre)
+// bit 2 : capture noire vers le haut    (2,1,1,2 à droite du centre)
+// bit 3 : capture noire vers le bas     (2,1,1,2 à gauche du centre)
+// bits 6-8 : nb free-three blancs
+// bits 9-11: nb free-three noirs
 
-#define ADD_WHITE_CAPTURES(f)  ((f) += (1 << 0))
-#define ADD_BLACK_CAPTURES(f)  ((f) += (1 << 3))
-#define ADD_WHITE_THREES(f)    ((f) += (1 << 6))
-#define ADD_BLACK_THREES(f)    ((f) += (1 << 9))
+#define GET_WHITE_CAPTURES_UP(f)    (((f) >> 0) & 0x1)
+#define GET_WHITE_CAPTURES_DOWN(f)  (((f) >> 1) & 0x1)
+#define GET_BLACK_CAPTURES_UP(f)    (((f) >> 2) & 0x1)
+#define GET_BLACK_CAPTURES_DOWN(f)  (((f) >> 3) & 0x1)
+#define GET_WHITE_THREES(f)         (((f) >> 6) & 0x7)
+#define GET_BLACK_THREES(f)         (((f) >> 9) & 0x7)
+
+#define ADD_WHITE_CAPTURES_UP(f)    ((f) |= (1 << 0))
+#define ADD_WHITE_CAPTURES_DOWN(f)  ((f) |= (1 << 1))
+#define ADD_BLACK_CAPTURES_UP(f)    ((f) |= (1 << 2))
+#define ADD_BLACK_CAPTURES_DOWN(f)  ((f) |= (1 << 3))
+#define ADD_WHITE_THREES(f)         ((f) += (1 << 6))
+#define ADD_BLACK_THREES(f)         ((f) += (1 << 9))
 
 enum Cell {
     EMPTY,
@@ -89,4 +97,4 @@ private:
     Move minimax(int depth, BitBoard& board, Cell player);
 };
 
-void makeMove(BitBoard& board, const Move& move, Cell player);
+int makeMove(BitBoard& board, const Move& move, Cell player);

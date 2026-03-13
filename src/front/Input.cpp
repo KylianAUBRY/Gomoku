@@ -99,9 +99,9 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
       int grid_y = (my - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
 
       if (Rules::is_valid_move(state, grid_x, grid_y)) {
-        Player current = state.current_player; // Before placement modifies it
+        // Player current = state.current_player; // Before placement modifies it
         if (state.place_stone(grid_x, grid_y)) {
-          Rules::process_captures(state, grid_x, grid_y, current);
+        //   Rules::process_captures(state, grid_x, grid_y, current);
 
           // Check win condition after the move
           if (Rules::check_win_condition(state, Player::BLACK) ||
@@ -127,9 +127,9 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
             state.last_ai_move_time_ms = elapsed_ms;
 
             // Place the AI stone
-            Player ai_player = state.current_player;
+            // Player ai_player = state.current_player;
             state.place_stone(ai_move.col, ai_move.row);
-            Rules::process_captures(state, ai_move.col, ai_move.row, ai_player);
+            // Rules::process_captures(state, ai_move.col, ai_move.row, ai_player);
 
             // Check win after AI move
             if (Rules::check_win_condition(state, Player::BLACK) ||

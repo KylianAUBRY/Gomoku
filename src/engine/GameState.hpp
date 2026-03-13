@@ -46,12 +46,15 @@ struct GameState {
     if (x < 0 || x >= 19 || y < 0 || y >= 19 || !is_empty(x, y)) {
       return false; // Invalid move
     }
-
     if (current_player == Player::BLACK) {
-      makeMove(board, {y, x, 0, 0}, BLACK);
+      if (makeMove(board, {y, x, 0, 0}, BLACK) == 1) {
+        return false; // Move was illegal (e.g. double-three)
+      }
       current_player = Player::WHITE;
     } else {
-      makeMove(board, {y, x, 0, 0}, WHITE);
+      if (makeMove(board, {y, x, 0, 0}, WHITE) == 1) {
+        return false; // Move was illegal (e.g. double-three)
+      }
       current_player = Player::BLACK;
     }
 

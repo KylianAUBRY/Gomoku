@@ -109,8 +109,8 @@ void GameUI::draw_board() {
   for (int i = 0; i < BOARD_SIZE; ++i) {
     // Column Letter
     char col_char = 'A' + i;
-    if (col_char >= 'I')
-      col_char++; // Skip 'I'
+    // if (col_char >= 'I')
+    //   col_char++; // Skip 'I'
     std::string col_str(1, col_char);
 
     sf::Text col_text_top(font, col_str, 18);

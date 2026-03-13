@@ -85,7 +85,6 @@ static Pattern patterns_free_three_black[] = {
     {{0,2,2,2,0,0}, 6, 0},
     {{0,2,2,0,2,0}, 6, 0},
     {{0,2,0,2,2,0}, 6, 0},
-    {{0,2,0,2,2,0}, 6, 0},
 };
 
 static int numPatterns_white =
@@ -187,26 +186,36 @@ void initEvalTable() {
       }
     }
 
-    if (line[4]==1 && line[5]==2 && line[6]==2 && line[7]==1) { score += 30000; ADD_WHITE_CAPTURES(flags); }
-    if (line[4]==1 && line[3]==2 && line[2]==2 && line[1]==1) { score -= 30000; ADD_WHITE_CAPTURES(flags); }
-    if (line[4]==2 && line[5]==1 && line[6]==1 && line[7]==2) { score -= 30000; ADD_BLACK_CAPTURES(flags); }
-    if (line[4]==2 && line[3]==1 && line[2]==1 && line[1]==2) { score += 30000; ADD_BLACK_CAPTURES(flags); }
+    if (line[4]==1 && line[5]==2 && line[6]==2 && line[7]==1) { score += 30000; ADD_WHITE_CAPTURES_DOWN(flags); }
+    if (line[4]==1 && line[3]==2 && line[2]==2 && line[1]==1) { score += 30000; ADD_WHITE_CAPTURES_UP(flags); }
+    if (line[4]==2 && line[5]==1 && line[6]==1 && line[7]==2) { score += -30000; ADD_BLACK_CAPTURES_DOWN(flags); }
+    if (line[4]==2 && line[3]==1 && line[2]==1 && line[1]==2) { score += -30000; ADD_BLACK_CAPTURES_UP(flags); }
 
+    int tmp = 0;
     for (int p = 0; p < numPatterns_free_three_white; p++) {
-      int plen = patterns_free_three_white[p].length;
-      for (int start = 0; start <= 9 - plen; start++) {
-        int match = 1;
-        for (int k = 0; k < plen; k++) {
-          if (line[start + k] != patterns_free_three_white[p].pattern[k] || (start + k == 4 && line[start + k] != 1)) {
-            match = 0;
-            break;
-          }
+        if (tmp > 0 && p == 1)
+            continue ;
+        int plen = patterns_free_three_white[p].length;
+        for (int start = 0; start <= 9 - plen; start++) {
+            int match = 1;
+            for (int k = 0; k < plen; k++) {
+                if (line[start + k] != patterns_free_three_white[p].pattern[k] || (start + k == 4 && line[start + k] != 1)) {
+                match = 0;
+                break;
+                }
+            }
+            if (match)
+            {
+                if (p == 0)
+                    tmp = 1;
+                ADD_WHITE_THREES(flags);
+            }
         }
-        if (match)
-          ADD_WHITE_THREES(flags);
-      }
     }
+    tmp = 0;
     for (int p = 0; p < numPatterns_free_three_black; p++) {
+        if (tmp > 0 && p == 1)
+            continue ;
       int plen = patterns_free_three_black[p].length;
       for (int start = 0; start <= 9 - plen; start++) {
         int match = 1;
@@ -217,7 +226,11 @@ void initEvalTable() {
           }
         }
         if (match)
+        {
+            if (p == 0)
+                tmp = 1;
           ADD_BLACK_THREES(flags);
+        }
       }
     }
 

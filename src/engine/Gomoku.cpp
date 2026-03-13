@@ -200,29 +200,15 @@ static int computeLineScore(const BitBoard& board, int row, int col, int dr, int
         }
         code = code * 4 + val;
     }
-    return evalTable[code][0];
+    return code;
 }
 
-void makeMove(BitBoard& board, const Move& move, Cell player) {
-    // int scoreBefore = board.score;
-    int pos = idx(move.row, move.col);
-    board.score -= computeLineScore(board, move.row, move.col, 0,  1);
-    board.score -= computeLineScore(board, move.row, move.col, 1,  0);
-    board.score -= computeLineScore(board, move.row, move.col, 1,  1);
-    board.score -= computeLineScore(board, move.row, move.col, 1, -1);
-
-    if (player == WHITE)
-        setBit(board.white, pos);
-    else
-        setBit(board.black, pos);
-    
-    board.score += computeLineScore(board, move.row, move.col, 0,  1);
-    board.score += computeLineScore(board, move.row, move.col, 1,  0);
-    board.score += computeLineScore(board, move.row, move.col, 1,  1);
-    board.score += computeLineScore(board, move.row, move.col, 1, -1);
-
-    // return board.score - scoreBefore;
-}
+/*
+#define GET_WHITE_CAPTURES(f)  (((f) >> 0) & 0x7)
+#define GET_BLACK_CAPTURES(f)  (((f) >> 3) & 0x7)
+#define GET_WHITE_THREES(f)    (((f) >> 6) & 0x7)
+#define GET_BLACK_THREES(f)    (((f) >> 9) & 0x7)
+*/
 
 static void undoMove(BitBoard& board, const Move& move, Cell player) {
     int pos = idx(move.row, move.col);
@@ -232,20 +218,126 @@ static void undoMove(BitBoard& board, const Move& move, Cell player) {
         clearBit(board.black, pos);
 }
 
+int makeMove(BitBoard& board, const Move& move, Cell player) {
+    static const int dirs[4][2] = {{0,1},{1,0},{1,1},{1,-1}};
+    int pos = idx(move.row, move.col);
+    int threesBefore = 0;
+    int threesAfter = 0;
+    int scoreAfter = board.score;
+    int scoreBefore = board.score;
+    int toRemove[16][2]; // max 8 captures (2 points chacune)
+    int removeCount = 0;
+
+    for (int di = 0; di < 4; di++) {
+        int code = computeLineScore(board, move.row, move.col, dirs[di][0], dirs[di][1]);
+        if (player == WHITE)
+            threesBefore += GET_WHITE_THREES(evalTable[code][1]);
+        else
+            threesBefore += GET_BLACK_THREES(evalTable[code][1]);
+        scoreBefore -= evalTable[code][0];
+    }
+
+    if (player == WHITE)
+        setBit(board.white, pos);
+    else
+        setBit(board.black, pos);
+
+    scoreAfter = scoreBefore;
+    for (int di = 0; di < 4; di++) {
+        int dr = dirs[di][0], dc = dirs[di][1];
+        int code = computeLineScore(board, move.row, move.col, dr, dc);
+        int flags = evalTable[code][1];
+        
+        if (player == WHITE) {
+            threesAfter += GET_WHITE_THREES(flags);
+            if (GET_WHITE_CAPTURES_UP(flags)) {
+                toRemove[removeCount][0] = move.row + dr;   toRemove[removeCount][1] = move.col + dc;   removeCount++;
+                toRemove[removeCount][0] = move.row + 2*dr; toRemove[removeCount][1] = move.col + 2*dc; removeCount++;
+            }
+            if (GET_WHITE_CAPTURES_DOWN(flags)) {
+                toRemove[removeCount][0] = move.row - dr;   toRemove[removeCount][1] = move.col - dc;   removeCount++;
+                toRemove[removeCount][0] = move.row - 2*dr; toRemove[removeCount][1] = move.col - 2*dc; removeCount++;
+            }
+        } else {
+            threesAfter += GET_BLACK_THREES(flags);
+            if (GET_BLACK_CAPTURES_UP(flags)) {
+                toRemove[removeCount][0] = move.row + dr;   toRemove[removeCount][1] = move.col + dc;   removeCount++;
+                toRemove[removeCount][0] = move.row + 2*dr; toRemove[removeCount][1] = move.col + 2*dc; removeCount++;
+            }
+            if (GET_BLACK_CAPTURES_DOWN(flags)) {
+                toRemove[removeCount][0] = move.row - dr;   toRemove[removeCount][1] = move.col - dc;   removeCount++;
+                toRemove[removeCount][0] = move.row - 2*dr; toRemove[removeCount][1] = move.col - 2*dc; removeCount++;
+            }
+        }
+        scoreAfter += evalTable[code][0];
+    }
+    if (threesAfter - threesBefore >= 2) {
+        removeCount = 0;
+        undoMove(board, move, player);
+        return 1;
+    }
+
+    if (removeCount > 0) {
+        scoreAfter = scoreBefore;
+        if (player == WHITE)
+            clearBit(board.white, pos);
+        else
+            clearBit(board.black, pos);
+        for (int i = 0; i < removeCount; i++)
+        {
+            for (int di = 0; di < 4; di++) {
+                int code = computeLineScore(board, move.row, move.col, dirs[di][0], dirs[di][1]);
+                scoreAfter -= evalTable[code][0];
+            }
+        }
+        for (int i = 0; i < removeCount; i++)
+        {
+            scoreAfter += MANUAL_CAPTURE_SCORE;
+            board.set(toRemove[i][0], toRemove[i][1], EMPTY);
+        }
+        if (player == WHITE)
+            setBit(board.white, pos);
+        else
+            setBit(board.black, pos);
+        for (int i = 0; i < removeCount; i++)
+        {
+            for (int di = 0; di < 4; di++) {
+                int code = computeLineScore(board, move.row, move.col, dirs[di][0], dirs[di][1]);
+                scoreAfter += evalTable[code][0];
+            }
+        }
+        for (int di = 0; di < 4; di++) {
+            int dr = dirs[di][0], dc = dirs[di][1];
+            int code = computeLineScore(board, move.row, move.col, dr, dc);
+            scoreAfter += evalTable[code][0];
+        }
+    }
+    board.score = scoreAfter;
+    return 0;
+}
+
 Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
     if (depth > DEPTH_LIMIT)
         return {-1, -1, board.score, 0};
 
     std::vector<Move> moves = generateMoves(board, player);
     Cell opponent = (player == WHITE) ? BLACK : WHITE;
+    
+    uint64_t white_board[BitBoard_SIZE];
+    uint64_t black_board[BitBoard_SIZE];
 
     if (player == WHITE) {
         Move best = {-1, -1, std::numeric_limits<int>::min(), 0};
-        for (const Move& move : moves) {
+        for (Move& move : moves) {
             int scoreBefore = board.score;
-            makeMove(board, move, WHITE);
+            std::memcpy(black_board, board.black, sizeof(board.black));
+            std::memcpy(white_board, board.white, sizeof(board.white));
+            if (makeMove(board, move, WHITE) == 1)
+                continue ; // coup illégal            
             Move eval = minimax(depth + 1, board, opponent);
-            undoMove(board, move, WHITE);
+            std::memcpy(board.black, black_board, sizeof(black_board));
+            std::memcpy(board.white, white_board, sizeof(white_board));
+            // undoMove(board, move, WHITE);
             board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
             if (eval.score > best.score) {
                 best = {move.row, move.col, eval.score, 0};
@@ -254,11 +346,17 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
         return best;
     } else {
         Move best = {-1, -1, std::numeric_limits<int>::max(), 0};
-        for (const Move& move : moves) {
+        for (Move& move : moves) {
             int scoreBefore = board.score;
-            makeMove(board, move, BLACK);
+            std::memcpy(black_board, board.black, sizeof(board.black));
+            std::memcpy(white_board, board.white, sizeof(board.white));
+            if (makeMove(board, move, BLACK) == 1)
+                continue ; // coup illégal
             Move eval = minimax(depth + 1, board, opponent);
-            undoMove(board, move, BLACK);
+            // undoMove(board, move, BLACK);
+
+            std::memcpy(board.black, black_board, sizeof(black_board));
+            std::memcpy(board.white, white_board, sizeof(white_board));
             board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
             if (eval.score < best.score) {
                 best = {move.row, move.col, eval.score, 0};
