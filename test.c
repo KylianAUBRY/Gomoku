@@ -72,30 +72,6 @@ static Pattern patterns_black[] = {
     {{3, 2, 2, 2, 3}, 5, -50},
     {{3, 2, 2, 2, 2, 3}, 6, -100},
 };
-
-static Pattern patterns_free_three_white[] = {
-    {{0,0,1,1,1,0}, 6, 0},
-    {{0,1,1,1,0,0}, 6, 0},
-    {{0,1,1,0,1,0}, 6, 0},
-    {{0,1,0,1,1,0}, 6, 0},
-};
-
-static Pattern patterns_free_three_black[] = {
-    {{0,0,2,2,2,0}, 6, 0},
-    {{0,2,2,2,0,0}, 6, 0},
-    {{0,2,2,0,2,0}, 6, 0},
-    {{0,2,0,2,2,0}, 6, 0},
-    {{0,2,0,2,2,0}, 6, 0},
-};
-
-static int numPatterns_white =
-    sizeof(patterns_white) / sizeof(patterns_white[0]);
-static int numPatterns_black =
-    sizeof(patterns_black) / sizeof(patterns_black[0]);
-static int numPatterns_free_three_white =
-    sizeof(patterns_free_three_white) / sizeof(patterns_free_three_white[0]);
-static int numPatterns_free_three_black =
-    sizeof(patterns_free_three_black) / sizeof(patterns_free_three_black[0]);
 /*
 0 = vide
 1 = blanc
@@ -145,6 +121,18 @@ int encode4(const int *cells, int length) {
   return code;
 }
 
+static int numPatterns_white =
+    sizeof(patterns_white) / sizeof(patterns_white[0]);
+static int numPatterns_black =
+    sizeof(patterns_black) / sizeof(patterns_black[0]);
+
+// Helpers pour matcher un pattern sur une sous-fenêtre de line[]
+static int matchAt(const int* line, int start, const int* pat, int plen) {
+    for (int k = 0; k < plen; k++)
+        if (line[start + k] != pat[k]) return 0;
+    return 1;
+}
+
 void initEvalTable() {
   for (int i = 0; i < 262144; i++) {
     int line[9];
@@ -187,39 +175,28 @@ void initEvalTable() {
       }
     }
 
-    if (line[4]==1 && line[5]==2 && line[6]==2 && line[7]==1) { score += 30000; ADD_WHITE_CAPTURES(flags); }
-    if (line[4]==1 && line[3]==2 && line[2]==2 && line[1]==1) { score -= 30000; ADD_WHITE_CAPTURES(flags); }
-    if (line[4]==2 && line[5]==1 && line[6]==1 && line[7]==2) { score -= 30000; ADD_BLACK_CAPTURES(flags); }
-    if (line[4]==2 && line[3]==1 && line[2]==1 && line[1]==2) { score += 30000; ADD_BLACK_CAPTURES(flags); }
+    // Patterns exceptionnels : captures
+    // centre = index 4, on cherche la séquence centrée
+    if (line[4]==1 && line[5]==2 && line[6]==2 && line[7]==1) { score += 30000; flags |= FLAG_WHITE_CAPTURE; }
+    if (line[4]==1 && line[3]==2 && line[2]==2 && line[1]==1) { score -= 30000; flags |= FLAG_WHITE_CAPTURE; }
+    if (line[4]==2 && line[5]==1 && line[6]==1 && line[7]==2) { score -= 30000; flags |= FLAG_BLACK_CAPTURE; }
+    if (line[4]==2 && line[3]==1 && line[2]==1 && line[1]==2) { score += 30000; flags |= FLAG_BLACK_CAPTURE; }
 
-    for (int p = 0; p < numPatterns_free_three_white; p++) {
-      int plen = patterns_free_three_white[p].length;
-      for (int start = 0; start <= 9 - plen; start++) {
-        int match = 1;
-        for (int k = 0; k < plen; k++) {
-          if (line[start + k] != patterns_free_three_white[p].pattern[k] || (start + k == 4 && line[start + k] != 1)) {
-            match = 0;
-            break;
-          }
-        }
-        if (match)
-          ADD_WHITE_THREES(flags);
-      }
-    }
-    for (int p = 0; p < numPatterns_free_three_black; p++) {
-      int plen = patterns_free_three_black[p].length;
-      for (int start = 0; start <= 9 - plen; start++) {
-        int match = 1;
-        for (int k = 0; k < plen; k++) {
-          if (line[start + k] != patterns_free_three_black[p].pattern[k] || (start + k == 4 && line[start + k] != 2)) {
-            match = 0;
-            break;
-          }
-        }
-        if (match)
-          ADD_BLACK_THREES(flags);
-      }
-    }
+    // Free-three blanc
+    static const int w3a[] = {0,1,1,1,0};
+    static const int w3b[] = {0,1,1,0,1,0};
+    static const int w3c[] = {0,1,0,1,1,0};
+    for (int s = 0; s <= 4; s++) if (matchAt(line, s, w3a, 5)) { flags |= FLAG_WHITE_THREE_A; break; }
+    for (int s = 0; s <= 3; s++) if (matchAt(line, s, w3b, 6)) { flags |= FLAG_WHITE_THREE_B; break; }
+    for (int s = 0; s <= 3; s++) if (matchAt(line, s, w3c, 6)) { flags |= FLAG_WHITE_THREE_C; break; }
+
+    // Free-three noir
+    static const int b3a[] = {0,2,2,2,0};
+    static const int b3b[] = {0,2,2,0,2,0};
+    static const int b3c[] = {0,2,0,2,2,0};
+    for (int s = 0; s <= 4; s++) if (matchAt(line, s, b3a, 5)) { flags |= FLAG_BLACK_THREE_A; break; }
+    for (int s = 0; s <= 3; s++) if (matchAt(line, s, b3b, 6)) { flags |= FLAG_BLACK_THREE_B; break; }
+    for (int s = 0; s <= 3; s++) if (matchAt(line, s, b3c, 6)) { flags |= FLAG_BLACK_THREE_C; break; }
 
     evalTable[i][0] = score;
     evalTable[i][1] = flags;

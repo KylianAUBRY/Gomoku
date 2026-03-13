@@ -200,7 +200,7 @@ static int computeLineScore(const BitBoard& board, int row, int col, int dr, int
         }
         code = code * 4 + val;
     }
-    return evalTable[code];
+    return evalTable[code][0];
 }
 
 void makeMove(BitBoard& board, const Move& move, Cell player) {

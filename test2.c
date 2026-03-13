@@ -72,30 +72,6 @@ static Pattern patterns_black[] = {
     {{3, 2, 2, 2, 3}, 5, -50},
     {{3, 2, 2, 2, 2, 3}, 6, -100},
 };
-
-static Pattern patterns_free_three_white[] = {
-    {{0,0,1,1,1,0}, 6, 0},
-    {{0,1,1,1,0,0}, 6, 0},
-    {{0,1,1,0,1,0}, 6, 0},
-    {{0,1,0,1,1,0}, 6, 0},
-};
-
-static Pattern patterns_free_three_black[] = {
-    {{0,0,2,2,2,0}, 6, 0},
-    {{0,2,2,2,0,0}, 6, 0},
-    {{0,2,2,0,2,0}, 6, 0},
-    {{0,2,0,2,2,0}, 6, 0},
-    {{0,2,0,2,2,0}, 6, 0},
-};
-
-static int numPatterns_white =
-    sizeof(patterns_white) / sizeof(patterns_white[0]);
-static int numPatterns_black =
-    sizeof(patterns_black) / sizeof(patterns_black[0]);
-static int numPatterns_free_three_white =
-    sizeof(patterns_free_three_white) / sizeof(patterns_free_three_white[0]);
-static int numPatterns_free_three_black =
-    sizeof(patterns_free_three_black) / sizeof(patterns_free_three_black[0]);
 /*
 0 = vide
 1 = blanc
@@ -145,12 +121,16 @@ int encode4(const int *cells, int length) {
   return code;
 }
 
+static int numPatterns_white =
+    sizeof(patterns_white) / sizeof(patterns_white[0]);
+static int numPatterns_black =
+    sizeof(patterns_black) / sizeof(patterns_black[0]);
+
 void initEvalTable() {
   for (int i = 0; i < 262144; i++) {
     int line[9];
     decode4(i, line);
     int score = 0;
-    int flags = 0;
 
     for (int p = 0; p < numPatterns_white; p++) {
       int plen = patterns_white[p].length;
@@ -186,43 +166,20 @@ void initEvalTable() {
           score += patterns_black[p].score;
       }
     }
-
-    if (line[4]==1 && line[5]==2 && line[6]==2 && line[7]==1) { score += 30000; ADD_WHITE_CAPTURES(flags); }
-    if (line[4]==1 && line[3]==2 && line[2]==2 && line[1]==1) { score -= 30000; ADD_WHITE_CAPTURES(flags); }
-    if (line[4]==2 && line[5]==1 && line[6]==1 && line[7]==2) { score -= 30000; ADD_BLACK_CAPTURES(flags); }
-    if (line[4]==2 && line[3]==1 && line[2]==1 && line[1]==2) { score += 30000; ADD_BLACK_CAPTURES(flags); }
-
-    for (int p = 0; p < numPatterns_free_three_white; p++) {
-      int plen = patterns_free_three_white[p].length;
-      for (int start = 0; start <= 9 - plen; start++) {
-        int match = 1;
-        for (int k = 0; k < plen; k++) {
-          if (line[start + k] != patterns_free_three_white[p].pattern[k] || (start + k == 4 && line[start + k] != 1)) {
-            match = 0;
-            break;
-          }
-        }
-        if (match)
-          ADD_WHITE_THREES(flags);
-      }
+    // ici seron traiter les paterne exeptionelle
+    if(line[4] == 1 && line[5] == 2 && line[6] == 2 && line[7] == 1)
+    {
+      score += 30000;
     }
-    for (int p = 0; p < numPatterns_free_three_black; p++) {
-      int plen = patterns_free_three_black[p].length;
-      for (int start = 0; start <= 9 - plen; start++) {
-        int match = 1;
-        for (int k = 0; k < plen; k++) {
-          if (line[start + k] != patterns_free_three_black[p].pattern[k] || (start + k == 4 && line[start + k] != 2)) {
-            match = 0;
-            break;
-          }
-        }
-        if (match)
-          ADD_BLACK_THREES(flags);
-      }
-    }
-
+    if(line[4] == 1 && line[3] == 2 && line[2] == 2 && line[1] == 1)
+        score -= 30000;
+    if(line[4] == 2 && line[5] == 1 && line[6] == 1 && line[7] == 2)
+      score += -30000;
+    if(line[4] == 2 && line[3] == 1 && line[2] == 1 && line[1] == 2)
+        score -= -30000;
     evalTable[i][0] = score;
-    evalTable[i][1] = flags;
+
+    //prendre en compte les patternes exceptionelle avec notament le evalTab[i][2] 
   }
 }
 
