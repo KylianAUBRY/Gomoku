@@ -94,7 +94,7 @@ public:
 
 private:
     std::vector<Move> generateMoves(const BitBoard& board, Cell player);
-    Move minimax(int depth, BitBoard& board, Cell player);
+    Move minimax(int depth, BitBoard& board, Cell player, int alpha, int beta);
 };
 
 int makeMove(BitBoard& board, const Move& move, Cell player);
