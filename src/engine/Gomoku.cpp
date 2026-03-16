@@ -316,7 +316,7 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
     return 0;
 }
 
-Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
+Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int beta) {
     if (depth > DEPTH_LIMIT)
         return {-1, -1, board.score, 0};
 
@@ -334,7 +334,7 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
             std::memcpy(white_board, board.white, sizeof(board.white));
             if (makeMove(board, move, WHITE) == 1)
                 continue ; // coup illégal            
-            Move eval = minimax(depth + 1, board, opponent);
+            Move eval = minimax(depth + 1, board, opponent, alpha, beta);
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
             // undoMove(board, move, WHITE);
@@ -342,6 +342,10 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
             if (eval.score > best.score) {
                 best = {move.row, move.col, eval.score, 0};
             }
+            if (best.score > alpha)
+                alpha = best.score;
+            if (alpha >= beta)
+                break; // coupure bêta
         }
         return best;
     } else {
@@ -352,7 +356,7 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
             std::memcpy(white_board, board.white, sizeof(board.white));
             if (makeMove(board, move, BLACK) == 1)
                 continue ; // coup illégal
-            Move eval = minimax(depth + 1, board, opponent);
+            Move eval = minimax(depth + 1, board, opponent, alpha, beta);
             // undoMove(board, move, BLACK);
 
             std::memcpy(board.black, black_board, sizeof(black_board));
@@ -361,6 +365,10 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player) {
             if (eval.score < best.score) {
                 best = {move.row, move.col, eval.score, 0};
             }
+            if (best.score < beta)
+                beta = best.score;
+            if (alpha >= beta)
+                break; // coupure alpha
         }
         return best;
     }
@@ -373,7 +381,7 @@ Move Gomoku::getBestMove(BitBoard& board, Cell player) {
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    Move bestMove = minimax(0, board, player);
+    Move bestMove = minimax(0, board, player, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()););
     clock_gettime(CLOCK_MONOTONIC, &end);
 
     double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
