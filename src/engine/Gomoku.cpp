@@ -325,13 +325,12 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
     
     uint64_t white_board[BitBoard_SIZE];
     uint64_t black_board[BitBoard_SIZE];
-
+    std::memcpy(black_board, board.black, sizeof(board.black));
+    std::memcpy(white_board, board.white, sizeof(board.white));
     if (player == WHITE) {
         Move best = {-1, -1, std::numeric_limits<int>::min(), 0};
         for (Move& move : moves) {
             int scoreBefore = board.score;
-            std::memcpy(black_board, board.black, sizeof(board.black));
-            std::memcpy(white_board, board.white, sizeof(board.white));
             if (makeMove(board, move, WHITE) == 1)
                 continue ; // coup illégal            
             Move eval = minimax(depth + 1, board, opponent, alpha, beta);
@@ -352,8 +351,6 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
         Move best = {-1, -1, std::numeric_limits<int>::max(), 0};
         for (Move& move : moves) {
             int scoreBefore = board.score;
-            std::memcpy(black_board, board.black, sizeof(board.black));
-            std::memcpy(white_board, board.white, sizeof(board.white));
             if (makeMove(board, move, BLACK) == 1)
                 continue ; // coup illégal
             Move eval = minimax(depth + 1, board, opponent, alpha, beta);
