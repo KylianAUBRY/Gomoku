@@ -46,22 +46,27 @@ void GameUI::render_menu() {
 
   sf::Text solo(font, "Mode Solo (vs IA)", 40);
   solo.setFillColor(menu_selection == 0 ? sf::Color::Yellow : sf::Color::White);
-  // Optional hover feedback can also be applied based on mouse position in
-  // Input::process_events but we reflect selection state here:
   sf::FloatRect solo_bounds = solo.getGlobalBounds();
   solo.setPosition(
-      {window.getSize().x / 2.0f - solo_bounds.size.x / 2.0f, 300.0f});
+      {window.getSize().x / 2.0f - solo_bounds.size.x / 2.0f, 280.0f});
 
   sf::Text multi(font, "Mode Multi (Local 1v1)", 40);
   multi.setFillColor(menu_selection == 1 ? sf::Color::Yellow
                                          : sf::Color::White);
   sf::FloatRect multi_bounds = multi.getGlobalBounds();
   multi.setPosition(
-      {window.getSize().x / 2.0f - multi_bounds.size.x / 2.0f, 400.0f});
+      {window.getSize().x / 2.0f - multi_bounds.size.x / 2.0f, 370.0f});
+
+  sf::Text bot(font, "Bot vs Bot", 40);
+  bot.setFillColor(menu_selection == 2 ? sf::Color::Yellow : sf::Color::White);
+  sf::FloatRect bot_bounds = bot.getGlobalBounds();
+  bot.setPosition(
+      {window.getSize().x / 2.0f - bot_bounds.size.x / 2.0f, 460.0f});
 
   window.draw(title);
   window.draw(solo);
   window.draw(multi);
+  window.draw(bot);
 
   window.display();
 }
@@ -73,13 +78,14 @@ void GameUI::render(const GameState &state) {
   draw_stones(state);
 
   if (current_state == UIState::PLAYING_SOLO ||
-      current_state == UIState::PLAYING_MULTI) {
+      current_state == UIState::PLAYING_MULTI ||
+      current_state == UIState::PLAYING_BOT) {
     draw_best_move(state);
     draw_hud(state);
     draw_history(state);
 
     if (state.game_over) {
-      draw_game_over(state);
+      draw_game_over(state, current_state);
     }
   }
 
@@ -183,22 +189,33 @@ void GameUI::draw_hud(const GameState &state) {
   window.draw(hud_bg);
 
   // Left: Mode Info
-  sf::Text info(font,
-                current_state == UIState::PLAYING_SOLO
-                    ? "Mode Solo - Esc to Quit"
-                    : "Mode Multi - Esc to Quit",
-                20);
+  std::string mode_str;
+  if (current_state == UIState::PLAYING_SOLO)
+    mode_str = "Mode Solo - Esc to Quit";
+  else if (current_state == UIState::PLAYING_MULTI)
+    mode_str = "Mode Multi - Esc to Quit";
+  else
+    mode_str = "Bot vs Bot - Esc to Quit";
+  sf::Text info(font, mode_str, 20);
   info.setFillColor(sf::Color::White);
   info.setPosition({20.0f, hud_y + 15.0f});
   window.draw(info);
 
-  // Left (below info): AI Timer
+  // Left (below info): AI Timer(s)
   if (current_state == UIState::PLAYING_SOLO) {
     char buffer[64];
     snprintf(buffer, sizeof(buffer), "AI Time: %.2f ms",
              state.last_ai_move_time_ms);
     sf::Text timer_text(font, buffer, 18);
-    timer_text.setFillColor(sf::Color::Cyan); // Distinct color for timer
+    timer_text.setFillColor(sf::Color::Cyan);
+    timer_text.setPosition({20.0f, hud_y + 55.0f});
+    window.draw(timer_text);
+  } else if (current_state == UIState::PLAYING_BOT) {
+    char buffer[128];
+    snprintf(buffer, sizeof(buffer), "Moy Bot1(N): %.2f ms  |  Moy Bot2(B): %.2f ms",
+             state.black_avg_time_ms, state.white_avg_time_ms);
+    sf::Text timer_text(font, buffer, 16);
+    timer_text.setFillColor(sf::Color::Cyan);
     timer_text.setPosition({20.0f, hud_y + 55.0f});
     window.draw(timer_text);
   }
@@ -232,7 +249,7 @@ void GameUI::draw_hud(const GameState &state) {
   window.draw(captures_text);
 }
 
-void GameUI::draw_game_over(const GameState &state) {
+void GameUI::draw_game_over(const GameState &state, UIState ui_state) {
   bool black_wins = Rules::check_win_condition(state, Player::BLACK) ||
                     Rules::check_win_by_capture(state, Player::BLACK);
   bool white_wins = Rules::check_win_condition(state, Player::WHITE) ||
@@ -257,18 +274,40 @@ void GameUI::draw_game_over(const GameState &state) {
        window.getSize().y / 2.0f - 100});
   window.draw(win_msg);
 
+  // Bot vs Bot: display average times
+  if (ui_state == UIState::PLAYING_BOT) {
+    char buf[128];
+    snprintf(buf, sizeof(buf), "Temps moyen Bot1 (Noir): %.2f ms",
+             state.black_avg_time_ms);
+    sf::Text t1(font, buf, 22);
+    t1.setFillColor(sf::Color::Cyan);
+    t1.setPosition(
+        {window.getSize().x / 2.0f - t1.getGlobalBounds().size.x / 2.0f,
+         window.getSize().y / 2.0f - 40});
+    window.draw(t1);
+
+    snprintf(buf, sizeof(buf), "Temps moyen Bot2 (Blanc): %.2f ms",
+             state.white_avg_time_ms);
+    sf::Text t2(font, buf, 22);
+    t2.setFillColor(sf::Color::Cyan);
+    t2.setPosition(
+        {window.getSize().x / 2.0f - t2.getGlobalBounds().size.x / 2.0f,
+         window.getSize().y / 2.0f - 10});
+    window.draw(t2);
+  }
+
   // Rejouer Button
   sf::RectangleShape btn(sf::Vector2f(200, 60));
-  btn.setFillColor(sf::Color(100, 100, 100)); // Dark grey base
+  btn.setFillColor(sf::Color(100, 100, 100));
   btn.setPosition(
-      {window.getSize().x / 2.0f - 100, window.getSize().y / 2.0f + 20});
+      {window.getSize().x / 2.0f - 100, window.getSize().y / 2.0f + 40});
   window.draw(btn);
 
   sf::Text replay_txt(font, "Rejouer", 30);
   replay_txt.setFillColor(sf::Color::White);
   replay_txt.setPosition(
       {window.getSize().x / 2.0f - replay_txt.getGlobalBounds().size.x / 2.0f,
-       window.getSize().y / 2.0f + 30});
+       window.getSize().y / 2.0f + 50});
   window.draw(replay_txt);
 }
 

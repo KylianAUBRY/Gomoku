@@ -4,7 +4,7 @@
 #include "../engine/Gomoku.hpp"
 #include <SFML/Graphics.hpp>
 
-enum class UIState { MAIN_MENU, PLAYING_SOLO, PLAYING_MULTI };
+enum class UIState { MAIN_MENU, PLAYING_SOLO, PLAYING_MULTI, PLAYING_BOT };
 
 // Layout constants
 static constexpr float CELL_SIZE = 35.0f;
@@ -37,7 +37,7 @@ private:
   void draw_board();
   void draw_stones(const GameState &state);
   void draw_hud(const GameState &state);
-  void draw_game_over(const GameState &state);
+  void draw_game_over(const GameState &state, UIState ui_state);
   void draw_history(const GameState &state);
   void draw_best_move(const GameState &state);
 };

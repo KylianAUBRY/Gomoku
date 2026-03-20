@@ -1,6 +1,7 @@
 #include "Input.hpp"
 #include "../engine/Rules.hpp"
 #include <chrono>
+#include <climits>
 
 // Helper: convert Player enum to Cell enum used by the engine
 static Cell playerToCell(Player p) {
@@ -12,15 +13,17 @@ namespace Input {
 void handle_menu_input(const sf::Event &event, UIState &current_state,
                        int &menu_selection, const sf::RenderWindow &window) {
   if (const auto *keyPressed = event.getIf<sf::Event::KeyPressed>()) {
-    if (keyPressed->scancode == sf::Keyboard::Scancode::Up ||
-        keyPressed->scancode == sf::Keyboard::Scancode::Down) {
-      menu_selection = (menu_selection == 0) ? 1 : 0;
+    if (keyPressed->scancode == sf::Keyboard::Scancode::Up) {
+      menu_selection = (menu_selection + 2) % 3;
+    } else if (keyPressed->scancode == sf::Keyboard::Scancode::Down) {
+      menu_selection = (menu_selection + 1) % 3;
     } else if (keyPressed->scancode == sf::Keyboard::Scancode::Enter) {
-      if (menu_selection == 0) {
+      if (menu_selection == 0)
         current_state = UIState::PLAYING_SOLO;
-      } else {
+      else if (menu_selection == 1)
         current_state = UIState::PLAYING_MULTI;
-      }
+      else
+        current_state = UIState::PLAYING_BOT;
     }
   }
 
@@ -30,25 +33,27 @@ void handle_menu_input(const sf::Event &event, UIState &current_state,
     float my = mouseMoved->position.y;
     float center_x = window.getSize().x / 2.0f;
 
-    // Approximated bounding boxes based on position and size
-    sf::FloatRect solo_rect({center_x - 150, 300}, {300, 50});
-    sf::FloatRect multi_rect({center_x - 200, 400}, {400, 50});
+    sf::FloatRect solo_rect({center_x - 150, 280}, {300, 50});
+    sf::FloatRect multi_rect({center_x - 200, 370}, {400, 50});
+    sf::FloatRect bot_rect({center_x - 100, 460}, {200, 50});
 
-    if (solo_rect.contains({mx, my})) {
+    if (solo_rect.contains({mx, my}))
       menu_selection = 0;
-    } else if (multi_rect.contains({mx, my})) {
+    else if (multi_rect.contains({mx, my}))
       menu_selection = 1;
-    }
+    else if (bot_rect.contains({mx, my}))
+      menu_selection = 2;
   }
 
   // Mouse click logic for menu
   if (const auto *mouseButton = event.getIf<sf::Event::MouseButtonPressed>()) {
     if (mouseButton->button == sf::Mouse::Button::Left) {
-      if (menu_selection == 0) {
+      if (menu_selection == 0)
         current_state = UIState::PLAYING_SOLO;
-      } else if (menu_selection == 1) {
+      else if (menu_selection == 1)
         current_state = UIState::PLAYING_MULTI;
-      }
+      else if (menu_selection == 2)
+        current_state = UIState::PLAYING_BOT;
     }
   }
 }
@@ -81,7 +86,7 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
       if (state.game_over) {
         // Check replay button click
         sf::FloatRect replay_btn(
-            {window.getSize().x / 2.0f - 100, window.getSize().y / 2.0f + 20},
+            {window.getSize().x / 2.0f - 100, window.getSize().y / 2.0f + 40},
             {200, 60});
         if (replay_btn.contains({mx, my})) {
           state.reset();
@@ -150,6 +155,44 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
   }
 }
 
+static void handle_bot_vs_bot(GameState &state, Gomoku &gomoku) {
+  if (state.game_over)
+    return;
+
+  Cell current_cell = playerToCell(state.current_player);
+  Move bot_move;
+
+  auto t_start = std::chrono::high_resolution_clock::now();
+  if (state.current_player == Player::BLACK)
+    bot_move = gomoku.getBestMove(state.board, current_cell);
+  else
+    bot_move = gomoku.getBestMove(state.board, current_cell);
+  auto t_end = std::chrono::high_resolution_clock::now();
+
+  double elapsed_ms =
+      std::chrono::duration<double, std::milli>(t_end - t_start).count();
+
+  if (state.current_player == Player::BLACK) {
+    state.black_move_count++;
+    state.black_avg_time_ms +=
+        (elapsed_ms - state.black_avg_time_ms) / state.black_move_count;
+  } else {
+    state.white_move_count++;
+    state.white_avg_time_ms +=
+        (elapsed_ms - state.white_avg_time_ms) / state.white_move_count;
+  }
+
+  state.place_stone(bot_move.col, bot_move.row);
+
+  if (Rules::check_win_condition(state, Player::BLACK) ||
+      Rules::check_win_by_capture(state, Player::BLACK) ||
+      Rules::check_win_condition(state, Player::WHITE) ||
+      Rules::check_win_by_capture(state, Player::WHITE)) {
+    state.game_over = true;
+    state.best_move_suggestion = {-1, -1, 0, 0};
+  }
+}
+
 void process_events(sf::RenderWindow &window, UIState &current_state,
                     int &menu_selection, GameState &state, Gomoku &gomoku) {
   while (const std::optional<sf::Event> event = window.pollEvent()) {
@@ -162,6 +205,10 @@ void process_events(sf::RenderWindow &window, UIState &current_state,
     } else {
       handle_game_input(*event, current_state, state, window, gomoku);
     }
+  }
+
+  if (current_state == UIState::PLAYING_BOT && !state.game_over) {
+    handle_bot_vs_bot(state, gomoku);
   }
 }
 } // namespace Input

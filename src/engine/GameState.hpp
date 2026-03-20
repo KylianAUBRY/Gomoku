@@ -23,6 +23,12 @@ struct GameState {
   double last_ai_move_time_ms = 0.0;
   int current_turn = 1;
 
+  // Bot vs Bot average times
+  double black_avg_time_ms = 0.0;
+  int    black_move_count  = 0;
+  double white_avg_time_ms = 0.0;
+  int    white_move_count  = 0;
+
   Move best_move_suggestion = {-1, -1, 0, 0};
 
   std::vector<GameMove> move_history;
@@ -35,6 +41,10 @@ struct GameState {
     game_over = false;
     last_ai_move_time_ms = 0.0;
     current_turn = 1;
+    black_avg_time_ms = 0.0;
+    black_move_count  = 0;
+    white_avg_time_ms = 0.0;
+    white_move_count  = 0;
     best_move_suggestion = {-1, -1, 0, 0};
     move_history.clear();
   }

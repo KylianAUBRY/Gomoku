@@ -5,7 +5,7 @@
 #include <cstdint>
 
 constexpr int SIZE = 19;
-constexpr int DEPTH_LIMIT = 3;
+constexpr int DEPTH_LIMIT = 5;
 constexpr int RANGE = 1;
 constexpr int BitBoard_SIZE = 6; // ceil(19*19 / 64) = 6
 
@@ -89,12 +89,14 @@ public:
     Gomoku();
 
     Move getBestMove(BitBoard& board, Cell player);
+    Move getBestMove2(BitBoard& board, Cell player);
     bool isLegalMove(const BitBoard& board, int row, int col, Cell player);
     
 
 private:
     std::vector<Move> generateMoves(const BitBoard& board, Cell player);
     Move minimax(int depth, BitBoard& board, Cell player, int alpha, int beta);
+    Move minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta);
 };
 
 int makeMove(BitBoard& board, const Move& move, Cell player);
