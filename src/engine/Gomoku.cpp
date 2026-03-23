@@ -318,7 +318,7 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
 }
 
 Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int beta) {
-    if (depth > DEPTH_LIMIT)
+    if (depth > DEPTH_LIMIT || std::abs(board.score) >= 1000000)
         return {-1, -1, board.score, 0};
 
     std::vector<Move> moves = generateMoves(board, player);
