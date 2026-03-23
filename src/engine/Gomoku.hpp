@@ -6,6 +6,7 @@
 
 constexpr int SIZE = 19;
 constexpr int DEPTH_LIMIT = 5;
+constexpr int MOVE_LIMIT = 20; // nb max de coups explorés par noeud dans minimax
 constexpr int RANGE = 1;
 constexpr int BitBoard_SIZE = 6; // ceil(19*19 / 64) = 6
 

@@ -166,7 +166,7 @@ static void handle_bot_vs_bot(GameState &state, Gomoku &gomoku) {
   if (state.current_player == Player::BLACK)
     bot_move = gomoku.getBestMove(state.board, current_cell);
   else
-    bot_move = gomoku.getBestMove(state.board, current_cell);
+    bot_move = gomoku.getBestMove2(state.board, current_cell);
   auto t_end = std::chrono::high_resolution_clock::now();
 
   double elapsed_ms =
