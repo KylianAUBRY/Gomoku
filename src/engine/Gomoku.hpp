@@ -76,6 +76,12 @@ struct BitBoard {
     bool isEmpty(int row, int col) const {
         return get(row, col) == EMPTY;
     }
+
+    bool hasCaptureWin(Cell player) const {
+        if (player == BLACK) return blackCaptures >= 10;
+        if (player == WHITE) return whiteCaptures >= 10;
+        return false;
+    }
 };
 
 struct Move {
