@@ -295,6 +295,10 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
         {
             scoreAfter += MANUAL_CAPTURE_SCORE;
             board.set(toRemove[i][0], toRemove[i][1], EMPTY);
+            if (player == WHITE)
+                board.whiteCaptures += static_cast<uint8_t>(removeCount);
+            else
+                board.blackCaptures += static_cast<uint8_t>(removeCount);
         }
         if (player == WHITE)
             setBit(board.white, pos);
