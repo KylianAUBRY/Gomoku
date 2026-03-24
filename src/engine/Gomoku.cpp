@@ -295,15 +295,15 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
         {
             scoreAfter += MANUAL_CAPTURE_SCORE;
             board.set(toRemove[i][0], toRemove[i][1], EMPTY);
-            if (player == WHITE)
-                board.whiteCaptures += static_cast<uint8_t>(removeCount);
-            else
-                board.blackCaptures += static_cast<uint8_t>(removeCount);
         }
-        if (player == WHITE)
+        if (player == WHITE) {
+            board.whiteCaptures += static_cast<uint8_t>(removeCount);
             setBit(board.white, pos);
-        else
+        }
+        else {
+            board.whiteCaptures += static_cast<uint8_t>(removeCount);
             setBit(board.black, pos);
+        }
         for (int i = 0; i < removeCount; i++)
         {
             for (int di = 0; di < 4; di++) {
