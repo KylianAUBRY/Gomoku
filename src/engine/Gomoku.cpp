@@ -338,6 +338,8 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
     if (depth > DEPTH_LIMIT || std::abs(board.score) >= 1000000)
         return {-1, -1, board.score, 0};
 
+    uint8_t whiteCapturesBefore = board.whiteCaptures;
+    uint8_t blackCapturesBefore = board.blackCaptures;
     uint64_t white_board[BitBoard_SIZE];
     uint64_t black_board[BitBoard_SIZE];
     std::memcpy(black_board, board.black, sizeof(board.black));
@@ -374,6 +376,8 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
             Move eval = minimax(depth + 1, board, opponent, alpha, beta);
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
+            board.whiteCaptures = whiteCapturesBefore;
+            board.blackCaptures = blackCapturesBefore;
             // undoMove(board, move, WHITE);
             board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
             if (eval.score > best.score) {
@@ -396,6 +400,8 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
 
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
+            board.whiteCaptures = whiteCapturesBefore;
+            board.blackCaptures = blackCapturesBefore;
             board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
             if (eval.score < best.score) {
                 best = {move.row, move.col, eval.score, 0};
@@ -416,6 +422,8 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
     std::vector<Move> moves = generateMoves(board, player);
     Cell opponent = (player == WHITE) ? BLACK : WHITE;
 
+    uint8_t whiteCapturesBefore = board.whiteCaptures;
+    uint8_t blackCapturesBefore = board.blackCaptures;
     uint64_t white_board[BitBoard_SIZE];
     uint64_t black_board[BitBoard_SIZE];
     std::memcpy(black_board, board.black, sizeof(board.black));
@@ -430,6 +438,8 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             move.score = (player == WHITE) ? std::numeric_limits<int>::min() : std::numeric_limits<int>::max();
         std::memcpy(board.black, black_board, sizeof(black_board));
         std::memcpy(board.white, white_board, sizeof(white_board));
+        board.whiteCaptures = whiteCapturesBefore;
+        board.blackCaptures = blackCapturesBefore;
         board.score = savedScore;
     }
     if (player == WHITE)
@@ -449,6 +459,8 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             Move eval = minimax(depth + 1, board, opponent, alpha, beta);
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
+            board.whiteCaptures = whiteCapturesBefore;
+            board.blackCaptures = blackCapturesBefore;
             // undoMove(board, move, WHITE);
             board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
             if (eval.score > best.score) {
@@ -471,6 +483,8 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
 
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
+            board.whiteCaptures = whiteCapturesBefore;
+            board.blackCaptures = blackCapturesBefore;
             board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
             if (eval.score < best.score) {
                 best = {move.row, move.col, eval.score, 0};
