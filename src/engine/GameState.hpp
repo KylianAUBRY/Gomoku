@@ -16,8 +16,6 @@ struct GameState {
   BitBoard board;
   Player current_player = Player::BLACK;
 
-  int black_captures = 0;
-  int white_captures = 0;
   bool game_over = false;
 
   double last_ai_move_time_ms = 0.0;
@@ -36,8 +34,6 @@ struct GameState {
   void reset() {
     board = BitBoard(); // Clear board
     current_player = Player::BLACK;
-    black_captures = 0;
-    white_captures = 0;
     game_over = false;
     last_ai_move_time_ms = 0.0;
     current_turn = 1;
