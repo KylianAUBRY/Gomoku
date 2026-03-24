@@ -291,18 +291,22 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
                 scoreAfter -= evalTable[code][0];
             }
         }
-        for (int i = 0; i < removeCount; i++)
-        {
-            scoreAfter += MANUAL_CAPTURE_SCORE;
-            board.set(toRemove[i][0], toRemove[i][1], EMPTY);
+        for (int i = 0; i < removeCount; i++) {
+          board.set(toRemove[i][0], toRemove[i][1], EMPTY);
         }
+    
         if (player == WHITE) {
-            board.whiteCaptures += static_cast<uint8_t>(removeCount);
-            setBit(board.white, pos);
-        }
-        else {
-            board.whiteCaptures += static_cast<uint8_t>(removeCount);
-            setBit(board.black, pos);
+          scoreAfter += MANUAL_CAPTURE_SCORE * removeCount;
+          board.whiteCaptures += static_cast<uint8_t>(removeCount);
+          IF (board.whiteCaptures >= 10)
+            scoreAfter += 1000000;
+          setBit(board.white, pos);
+        } else {
+          scoreAfter -= MANUAL_CAPTURE_SCORE * removeCount;
+          board.blackCaptures += static_cast<uint8_t>(removeCount);
+          If (board.blackCaptures >= 10)
+            scoreAfter -= 1000000;
+          setBit(board.black, pos);
         }
         for (int i = 0; i < removeCount; i++)
         {
