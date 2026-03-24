@@ -47,6 +47,8 @@ struct BitBoard {
     uint64_t black[BitBoard_SIZE] = {};
     uint64_t white[BitBoard_SIZE] = {};
     int score = 0;
+    uint8_t blackCaptures = 0;
+    uint8_t whiteCaptures = 0;
 
     // Retourne la cellule à (row, col)
     Cell get(int row, int col) const {
