@@ -241,8 +241,8 @@ void GameUI::draw_hud(const GameState &state) {
   // Right: Captures
   sf::Text captures_text(
       font,
-      "Captures (B: " + std::to_string(state.black_captures) +
-          " | W: " + std::to_string(state.white_captures) + ")",
+      "Captures (B: " + std::to_string(state.board.black_captures) +
+          " | W: " + std::to_string(state.board.white_captures) + ")",
       20);
   captures_text.setFillColor(sf::Color::White);
   captures_text.setPosition({window.getSize().x - 220.0f, hud_y + 35.0f});
