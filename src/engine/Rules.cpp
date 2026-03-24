@@ -92,9 +92,9 @@ CaptureResult process_captures(GameState &state, int x, int y,
     if (result.captured)
     {
         if (current_player == Player::BLACK)
-            state.black_captures += result.count;
+            state.board.blackCaptures += static_cast<uint8_t>(result.count);
         else
-            state.white_captures += result.count;
+            state.board.whiteCaptures += static_cast<uint8_t>(result.count);
     }
 
     return result;
@@ -111,8 +111,8 @@ bool is_valid_move(const GameState &state, int x, int y)
 bool check_win_by_capture(const GameState &state, Player player)
 {
     if (player == Player::BLACK)
-        return state.black_captures >= 10;
-    return state.white_captures >= 10;
+        return state.board.blackCaptures >= 10;
+    return state.board.whiteCaptures >= 10;
 }
 
 } // namespace Rules
