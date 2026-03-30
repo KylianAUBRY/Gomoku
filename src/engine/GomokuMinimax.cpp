@@ -35,6 +35,14 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
         return a.row == b.row && a.col == b.col;
     };
 
+    auto updateKiller = [&](const Move& m) {
+        if (depth >= DEPTH_LIMIT + 2) return;
+        if (!sameCell(m, killerMoves[depth][0])) {
+            killerMoves[depth][1] = killerMoves[depth][0];
+            killerMoves[depth][0] = m;
+        }
+    };
+
     for (Move &move : moves) {
         if (depth < DEPTH_LIMIT + 2) {
             if (sameCell(move, killerMoves[depth][0]))
@@ -67,8 +75,11 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
             }
             if (best.score > alpha)
                 alpha = best.score;
-            if (alpha >= beta)
+            if (alpha >= beta) {
+                updateKiller(move);
+                historyHeuristic[move.row][move.col] += 1 << (DEPTH_LIMIT - depth);
                 break; // coupure bêta
+            }
         }
         return best;
     } else {
@@ -90,8 +101,11 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
             }
             if (best.score < beta)
                 beta = best.score;
-            if (alpha >= beta)
+            if (alpha >= beta) {
+                updateKiller(move);
+                historyHeuristic[move.row][move.col] += 1 << (DEPTH_LIMIT - depth);
                 break; // coupure alpha
+            }
         }
         return best;
     }

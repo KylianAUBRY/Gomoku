@@ -49,6 +49,7 @@ struct BitBoard {
     int score = 0;
     uint8_t blackCaptures = 0;
     uint8_t whiteCaptures = 0;
+    uint64_t hash = 0; // Hash Zobrist incrémental — mis à jour dans apply_move
 
     // Retourne la cellule à (row, col)
     Cell get(int row, int col) const {
@@ -99,6 +100,7 @@ public:
 
     Move getBestMove(BitBoard& board, Cell player);
     Move getBestMove2(BitBoard& board, Cell player);
+    Move getBestMove3(BitBoard& board, Cell player);
     bool isLegalMove(const BitBoard& board, int row, int col, Cell player);
     
 
@@ -106,6 +108,15 @@ private:
     std::vector<Move> generateMoves(const BitBoard& board, Cell player);
     Move minimax(int depth, BitBoard& board, Cell player, int alpha, int beta);
     Move minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta);
+    Move minimax3(int depth, BitBoard& board, Cell player, int alpha, int beta);
 };
 
 int makeMove(BitBoard& board, const Move& move, Cell player);
+inline int idx(int row, int col) { return row * SIZE + col; }
+inline bool getBit(const uint64_t* bb, int pos) { return (bb[pos / 64] >> (pos % 64)) & 1ULL; }
+inline void setBit(uint64_t* bb, int pos) { bb[pos / 64] |= (1ULL << (pos % 64)); }
+inline void clearBit(uint64_t* bb, int pos) { bb[pos / 64] &= ~(1ULL << (pos % 64)); }
+inline bool isEmpty(const BitBoard& b, int row, int col) { int p = idx(row, col); return !getBit(b.white, p) && !getBit(b.black, p); }
+void computeInRange(const BitBoard& b, uint64_t* inRange);
+int computeLineScore(const BitBoard& board, int row, int col, int dr, int dc);
+void undoMove(BitBoard& board, const Move& move, Cell player);

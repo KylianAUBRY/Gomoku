@@ -7,30 +7,8 @@
 // static constexpr int TOTAL_BITS = SIZE * SIZE; // 361
 
 
-static inline int idx(int row, int col) {
-    return row * SIZE + col;
-}
-
-static inline bool getBit(const uint64_t* bb, int pos) {
-    return (bb[pos / 64] >> (pos % 64)) & 1ULL;
-}
-
-static inline void setBit(uint64_t* bb, int pos) {
-    bb[pos / 64] |= (1ULL << (pos % 64));
-}
-
-static inline void clearBit(uint64_t* bb, int pos) {
-    bb[pos / 64] &= ~(1ULL << (pos % 64));
-}
-
-// Vérifie si la case (row,col) est occupée par l'un ou l'autre joueur
-static inline bool isEmpty(const BitBoard& b, int row, int col) {
-    int pos = idx(row, col);
-    return !getBit(b.white, pos) && !getBit(b.black, pos);
-}
-
 // Génère le bitboard des cases "à portée" d'une pièce existante
-static void computeInRange(const BitBoard& b, uint64_t* inRange) {
+void computeInRange(const BitBoard& b, uint64_t* inRange) {
     // Reset
     for (int i = 0; i < 6; i++) inRange[i] = 0ULL;
 
@@ -170,12 +148,13 @@ std::vector<Move> Gomoku::generateMoves(const BitBoard& board, const Cell player
     uint64_t inRange[6] = {};
 
     computeInRange(board, inRange);
+    (void) player;
 
     for (int row = 0; row < SIZE; row++) {
         for (int col = 0; col < SIZE; col++) {
             int pos = idx(row, col);
             if (isEmpty(board, row, col) && getBit(inRange, pos) /*&& isLegalMove(board, row, col, player)*/)
-                moves.push_back({row, col, 0, 0})
+                moves.push_back({row, col, 0, 0});
         }
     }
 
@@ -185,7 +164,7 @@ std::vector<Move> Gomoku::generateMoves(const BitBoard& board, const Cell player
     return moves;
 }
 
-static int computeLineScore(const BitBoard& board, int row, int col, int dr, int dc) {
+int computeLineScore(const BitBoard& board, int row, int col, int dr, int dc) {
     int code = 0;
     for (int i = 0; i < 9; i++) {
         int r = row + ((i - 4) * dr);
@@ -211,7 +190,7 @@ static int computeLineScore(const BitBoard& board, int row, int col, int dr, int
 #define GET_BLACK_THREES(f)    (((f) >> 9) & 0x7)
 */
 
-static void undoMove(BitBoard& board, const Move& move, Cell player) {
+void undoMove(BitBoard& board, const Move& move, Cell player) {
     int pos = idx(move.row, move.col);
     if (player == WHITE)
         clearBit(board.white, pos);
