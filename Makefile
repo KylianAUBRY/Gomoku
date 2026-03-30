@@ -15,7 +15,9 @@ SRCS = src/main.cpp \
        src/front/GameUI.cpp \
        src/front/Input.cpp \
        src/engine/Rules.cpp \
-	   src/engine/Gomoku.cpp
+       src/engine/GomokuCommon.cpp \
+       src/engine/GomokuMinimax.cpp \
+       src/engine/GomokuMinimax2.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 
