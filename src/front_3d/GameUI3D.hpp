@@ -45,6 +45,20 @@ private:
     float vm_bob_time;      // running timer for idle bob
     float vm_recoil;        // recoil amount (decays over time)
 
+    // Bolt-action animation (AWP)
+    float bolt_anim_timer_;
+    static constexpr float BOLT_ANIM_DURATION = 0.60f;
+
+    // Shell casing ejection
+    struct ShellCasing {
+        float r, u, f;       // position offset from grip (cam right/up/fwd)
+        float vr, vu, vf;    // velocity
+        float timer;         // lifetime
+        float rot;           // rotation angle (degrees, cosmetic)
+        float rot_spd;
+    };
+    std::vector<ShellCasing> shell_casings_;
+
     // Capture animations
     struct CaptureAnim3D { int row, col; float timer; };
     std::vector<CaptureAnim3D> capture_anims;

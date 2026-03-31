@@ -40,6 +40,7 @@ GameUI3D::GameUI3D()
       cam_yaw(0.0f), cam_pitch(0.0f),
       hovered_row(-1), hovered_col(-1), has_hover(false),
       vm_bob_time(0.0f), vm_recoil(0.0f),
+      bolt_anim_timer_(0.0f),
       ai_pending_(false),
       ai_highlight_row_(-1), ai_highlight_col_(-1), ai_highlight_timer_(0.0f) {
     InitWindow(1280, 720, "Gomoku FPS");
@@ -137,6 +138,24 @@ void GameUI3D::run(GameState &state, Gomoku &gomoku) {
             if (vm_recoil > 0.0f) vm_recoil -= dt * 6.0f;
             if (vm_recoil < 0.0f) vm_recoil = 0.0f;
 
+            // Bolt-action timer
+            if (bolt_anim_timer_ > 0.0f) bolt_anim_timer_ -= dt;
+            if (bolt_anim_timer_ < 0.0f) bolt_anim_timer_ = 0.0f;
+
+            // Shell casing physics (gravity in viewmodel up-axis)
+            for (auto &s : shell_casings_) {
+                s.vu  -= 4.0f * dt;
+                s.r   += s.vr * dt;
+                s.u   += s.vu * dt;
+                s.f   += s.vf * dt;
+                s.rot += s.rot_spd * dt;
+                s.timer -= dt;
+            }
+            shell_casings_.erase(
+                std::remove_if(shell_casings_.begin(), shell_casings_.end(),
+                    [](const ShellCasing &s) { return s.timer <= 0.0f; }),
+                shell_casings_.end());
+
             // Update capture animation timers
             for (auto &a : capture_anims)
                 a.timer -= dt;
@@ -199,6 +218,8 @@ void GameUI3D::handle_game_input(GameState &state, Gomoku &gomoku) {
         state.reset();
         init_camera();
         ai_pending_ = false;
+        bolt_anim_timer_ = 0.0f;
+        shell_casings_.clear();
         return;
     }
 
@@ -206,6 +227,8 @@ void GameUI3D::handle_game_input(GameState &state, Gomoku &gomoku) {
         if (IsKeyPressed(KEY_R)) {
             state.reset();
             ai_pending_ = false;
+            bolt_anim_timer_ = 0.0f;
+            shell_casings_.clear();
         }
         return;
     }
@@ -215,10 +238,24 @@ void GameUI3D::handle_game_input(GameState &state, Gomoku &gomoku) {
         return;
     }
 
+    // Bolt animation blocks any new shot
+    if (bolt_anim_timer_ > 0.0f)
+        return;
+
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && has_hover) {
         if (Rules::is_valid_move(state, hovered_col, hovered_row)) {
             if (state.place_stone(hovered_col, hovered_row)) {
-                vm_recoil = 1.0f; // trigger recoil animation
+                vm_recoil = 1.0f;
+                bolt_anim_timer_ = BOLT_ANIM_DURATION;
+
+                // Eject a shell casing (left side of receiver, slight upward kick)
+                ShellCasing s;
+                s.r = -0.02f; s.u = 0.03f; s.f = 0.05f;
+                s.vr = -0.40f; s.vu = 0.35f; s.vf = -0.10f;
+                s.timer = 0.70f;
+                s.rot = 0.0f; s.rot_spd = 600.0f;
+                shell_casings_.push_back(s);
+
                 check_game_over(state);
 
                 if (!state.game_over) {
@@ -438,223 +475,264 @@ void GameUI3D::draw_best_move_3d(const GameState &state) {
 // Depth buffer is cleared so the viewmodel always renders on top.
 
 void GameUI3D::draw_viewmodel_3d(const GameState &state) {
-    // Flush pending draws, then disable depth test so viewmodel renders on top
     rlDrawRenderBatchActive();
 
-    // Compute camera basis vectors for viewmodel positioning
-    Vector3 cam_dir = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+    // Camera basis vectors
+    Vector3 cam_dir   = Vector3Normalize(Vector3Subtract(camera.target, camera.position));
     Vector3 cam_right = Vector3Normalize(Vector3CrossProduct(cam_dir, camera.up));
-    Vector3 cam_up_actual = Vector3Normalize(Vector3CrossProduct(cam_right, cam_dir));
+    Vector3 cam_up    = Vector3Normalize(Vector3CrossProduct(cam_right, cam_dir));
 
-    // Create a viewmodel camera very close to the origin
-    // The viewmodel lives in its own mini-space
+    // Dedicated viewmodel camera (origin at 0,0,0, FOV slightly wider)
     Camera3D vm_cam = {};
-    vm_cam.position = {0.0f, 0.0f, 0.0f};
-    vm_cam.target = cam_dir;
-    vm_cam.up = cam_up_actual;
-    vm_cam.fovy = 65.0f;  // slightly wider FOV for viewmodel (standard FPS feel)
+    vm_cam.position   = {0.0f, 0.0f, 0.0f};
+    vm_cam.target     = cam_dir;
+    vm_cam.up         = cam_up;
+    vm_cam.fovy       = 65.0f;
     vm_cam.projection = CAMERA_PERSPECTIVE;
 
-    // Idle bobbing
+    // Idle bob
     float bob_x = sinf(vm_bob_time * 1.8f) * 0.015f;
     float bob_y = sinf(vm_bob_time * 3.6f) * 0.008f;
 
-    // Recoil: pushes weapon back (along -cam_dir) and rotates up slightly
-    float recoil_back = vm_recoil * 0.12f;
-    float recoil_up   = vm_recoil * 0.04f;
+    // Recoil (sniper kick: stronger back push)
+    float recoil_back = vm_recoil * 0.18f;
+    float recoil_up   = vm_recoil * 0.07f;
 
-    // Weapon base offset: bottom-right of view
-    // In viewmodel space: right = +cam_right, down = -cam_up, forward = +cam_dir
-    float base_right  =  0.35f + bob_x;
-    float base_down   = -0.28f + bob_y;
-    float base_forward =  0.6f - recoil_back;
+    // Grip position (pistol grip of the AWP, bottom-right of screen)
+    float base_right   =  0.30f + bob_x;
+    float base_down    = -0.22f + bob_y;
+    float base_forward =  0.55f - recoil_back;
 
-    Vector3 vm_origin = {0, 0, 0};
-    vm_origin = Vector3Add(vm_origin, Vector3Scale(cam_right, base_right));
-    vm_origin = Vector3Add(vm_origin, Vector3Scale(cam_up_actual, base_down));
-    vm_origin = Vector3Add(vm_origin, Vector3Scale(cam_dir, base_forward));
-    vm_origin = Vector3Add(vm_origin, Vector3Scale(cam_up_actual, recoil_up));
+    Vector3 grip = Vector3Scale(cam_right, base_right);
+    grip = Vector3Add(grip, Vector3Scale(cam_up, base_down));
+    grip = Vector3Add(grip, Vector3Scale(cam_dir, base_forward));
+    grip = Vector3Add(grip, Vector3Scale(cam_up, recoil_up));
 
+    // Colors
     Color weapon_col = getWeaponColor(state.current_player);
     Color weapon_dark = {
-        (unsigned char)(weapon_col.r * 0.5f),
-        (unsigned char)(weapon_col.g * 0.5f),
-        (unsigned char)(weapon_col.b * 0.5f),
-        255};
+        (unsigned char)(weapon_col.r * 0.45f),
+        (unsigned char)(weapon_col.g * 0.45f),
+        (unsigned char)(weapon_col.b * 0.45f), 255};
     Color weapon_light = {
-        (unsigned char)((int)weapon_col.r + ((255 - (int)weapon_col.r) / 3)),
-        (unsigned char)((int)weapon_col.g + ((255 - (int)weapon_col.g) / 3)),
-        (unsigned char)((int)weapon_col.b + ((255 - (int)weapon_col.b) / 3)),
-        255};
-    Color skin_col = {210, 170, 130, 255};
-    Color skin_dark = {180, 140, 100, 255};
-    Color sleeve_col = {60, 60, 60, 255};
+        (unsigned char)((int)weapon_col.r + (255 - (int)weapon_col.r) / 3),
+        (unsigned char)((int)weapon_col.g + (255 - (int)weapon_col.g) / 3),
+        (unsigned char)((int)weapon_col.b + (255 - (int)weapon_col.b) / 3), 255};
+    Color skin_col    = {210, 170, 130, 255};
+    Color skin_dark   = {180, 140, 100, 255};
+    Color sleeve_col  = {60,  60,  60,  255};
+    Color scope_col   = {35,  35,  35,  255};
+    Color scope_lens  = {20,  80,  110, 220};
 
-    // Disable depth test so viewmodel is always on top of the scene
     rlDisableDepthTest();
-
     BeginMode3D(vm_cam);
 
-    // Rotation matrix: maps local X→cam_right, Y→cam_up, Z→cam_dir
-    // so DrawCube faces align with the camera instead of world axes.
+    // Rotation matrix aligning DrawCube faces to camera axes
     float rot[16] = {
-        cam_right.x,    cam_right.y,    cam_right.z,    0,
-        cam_up_actual.x,cam_up_actual.y,cam_up_actual.z,0,
-        cam_dir.x,      cam_dir.y,      cam_dir.z,      0,
-        0,              0,              0,              1
+        cam_right.x, cam_right.y, cam_right.z, 0,
+        cam_up.x,    cam_up.y,    cam_up.z,    0,
+        cam_dir.x,   cam_dir.y,   cam_dir.z,   0,
+        0,           0,           0,           1
     };
 
-    // Draw an oriented cube aligned to camera axes
-    auto drawOrientedCube = [&](Vector3 center, float w, float h, float l, Color c) {
+    auto drawBox = [&](Vector3 c, float w, float h, float l, Color col) {
         rlPushMatrix();
-        rlTranslatef(center.x, center.y, center.z);
+        rlTranslatef(c.x, c.y, c.z);
         rlMultMatrixf(rot);
-        DrawCube({0, 0, 0}, w, h, l, c);
+        DrawCube({0,0,0}, w, h, l, col);
+        rlPopMatrix();
+    };
+    auto drawBoxWires = [&](Vector3 c, float w, float h, float l, Color col) {
+        rlPushMatrix();
+        rlTranslatef(c.x, c.y, c.z);
+        rlMultMatrixf(rot);
+        DrawCubeWires({0,0,0}, w, h, l, col);
         rlPopMatrix();
     };
 
-    auto drawOrientedCubeWires = [&](Vector3 center, float w, float h, float l, Color c) {
-        rlPushMatrix();
-        rlTranslatef(center.x, center.y, center.z);
-        rlMultMatrixf(rot);
-        DrawCubeWires({0, 0, 0}, w, h, l, c);
-        rlPopMatrix();
-    };
+    // ── Barrel (very long, thin — AWP signature) ──
+    Vector3 barrel_up = Vector3Add(grip, Vector3Scale(cam_up, 0.028f));
+    Vector3 barrel_start = barrel_up;
+    Vector3 barrel_end   = Vector3Add(barrel_up, Vector3Scale(cam_dir, 0.82f));
+    // Thin outer barrel
+    DrawCylinderEx(barrel_start, barrel_end, 0.013f, 0.011f, 8, weapon_col);
+    // Thicker shroud near receiver (first third)
+    Vector3 shroud_end = Vector3Add(barrel_start, Vector3Scale(cam_dir, 0.28f));
+    DrawCylinderEx(barrel_start, shroud_end, 0.020f, 0.016f, 8, weapon_dark);
 
-    // ── Barrel ──
-    // Long cylinder-like shape (we use a stretched cube) pointing forward
+    // ── Receiver body ──
+    Vector3 recv = Vector3Add(grip, Vector3Scale(cam_dir, 0.06f));
+    recv = Vector3Add(recv, Vector3Scale(cam_up, 0.026f));
+    drawBox(recv, 0.062f, 0.052f, 0.22f, weapon_col);
+    drawBoxWires(recv, 0.063f, 0.053f, 0.221f, weapon_dark);
+
+    // ── Ejection port cover (right side of receiver, decorative) ──
     {
-        Vector3 barrel_center = Vector3Add(vm_origin, Vector3Scale(cam_dir, 0.18f));
-        barrel_center = Vector3Add(barrel_center, Vector3Scale(cam_up_actual, 0.015f));
-        // Barrel: elongated along cam_dir
-        // Use DrawCube with rotation — simpler: draw a cylinder
-        DrawCylinderEx(
-            Vector3Add(vm_origin, Vector3Scale(cam_dir, 0.0f)),
-            Vector3Add(vm_origin, Vector3Scale(cam_dir, 0.35f)),
-            0.02f, 0.018f, 8, weapon_col);
-        // Barrel outer casing
-        DrawCylinderEx(
-            Vector3Add(vm_origin, Vector3Scale(cam_dir, -0.02f)),
-            Vector3Add(vm_origin, Vector3Scale(cam_dir, 0.15f)),
-            0.032f, 0.028f, 8, weapon_dark);
+        Vector3 port = Vector3Add(recv, Vector3Scale(cam_right, -0.031f));
+        port = Vector3Add(port, Vector3Scale(cam_dir, 0.02f));
+        drawBox(port, 0.004f, 0.030f, 0.06f, weapon_dark);
     }
 
-    // ── Receiver / body ──
+    // ── Scope mounts (two rings connecting scope to receiver) ──
     {
-        Vector3 body_center = Vector3Add(vm_origin, Vector3Scale(cam_dir, -0.02f));
-        body_center = Vector3Add(body_center, Vector3Scale(cam_up_actual, -0.01f));
-
-        // Main body block
-        drawOrientedCube(body_center, 0.07f, 0.055f, 0.14f, weapon_col);
-        drawOrientedCubeWires(body_center, 0.071f, 0.056f, 0.141f, weapon_dark);
-
-        // Top rail / slide
-        Vector3 slide = Vector3Add(body_center, Vector3Scale(cam_up_actual, 0.032f));
-        drawOrientedCube(slide, 0.05f, 0.015f, 0.16f, weapon_light);
+        Vector3 mnt_fwd  = Vector3Add(recv, Vector3Scale(cam_dir,  0.06f));
+        mnt_fwd  = Vector3Add(mnt_fwd,  Vector3Scale(cam_up, 0.034f));
+        Vector3 mnt_back = Vector3Add(recv, Vector3Scale(cam_dir, -0.06f));
+        mnt_back = Vector3Add(mnt_back, Vector3Scale(cam_up, 0.034f));
+        drawBox(mnt_fwd,  0.064f, 0.020f, 0.022f, weapon_dark);
+        drawBox(mnt_back, 0.064f, 0.020f, 0.022f, weapon_dark);
     }
 
-    // ── Grip ──
+    // ── Scope (prominent — AWP's defining feature) ──
     {
-        Vector3 grip_top = Vector3Add(vm_origin, Vector3Scale(cam_dir, -0.03f));
-        grip_top = Vector3Add(grip_top, Vector3Scale(cam_up_actual, -0.04f));
-        Vector3 grip_bottom = Vector3Add(grip_top, Vector3Scale(cam_up_actual, -0.10f));
-        // Slight angle: grip tilts back
-        grip_bottom = Vector3Add(grip_bottom, Vector3Scale(cam_dir, -0.025f));
+        Vector3 scope_center = Vector3Add(recv, Vector3Scale(cam_up, 0.065f));
+        // Main tube
+        Vector3 scope_f = Vector3Add(scope_center, Vector3Scale(cam_dir,  0.115f));
+        Vector3 scope_b = Vector3Add(scope_center, Vector3Scale(cam_dir, -0.115f));
+        DrawCylinderEx(scope_b, scope_f, 0.026f, 0.024f, 10, scope_col);
+        // Objective bell (front)
+        Vector3 obj_tip = Vector3Add(scope_f, Vector3Scale(cam_dir, 0.028f));
+        DrawCylinderEx(scope_f, obj_tip, 0.024f, 0.040f, 10, scope_col);
+        DrawSphere(obj_tip, 0.041f, scope_col);
+        // Lens at objective
+        DrawSphere(Vector3Add(obj_tip, Vector3Scale(cam_dir, 0.006f)), 0.032f, scope_lens);
+        // Eyepiece bell (back)
+        Vector3 eye_tip = Vector3Add(scope_b, Vector3Scale(cam_dir, -0.028f));
+        DrawCylinderEx(scope_b, eye_tip, 0.026f, 0.038f, 10, scope_col);
+        // Elevation turret (top knob on scope body)
+        Vector3 turret = Vector3Add(scope_center, Vector3Scale(cam_up, 0.030f));
+        DrawCylinderEx(turret, Vector3Add(turret, Vector3Scale(cam_up, 0.018f)), 0.012f, 0.010f, 6, weapon_dark);
+    }
 
-        DrawCylinderEx(grip_top, grip_bottom, 0.025f, 0.022f, 8, weapon_dark);
+    // ── Bolt handle (slides back when firing, returns forward) ──
+    {
+        // Compute bolt travel (0 = home, 1 = fully open)
+        float bolt_t = bolt_anim_timer_ / BOLT_ANIM_DURATION;  // 1→0
+        float bolt_phase;
+        if (bolt_t > 0.5f)
+            bolt_phase = (1.0f - bolt_t) * 2.0f;   // opening: 0→1
+        else
+            bolt_phase = bolt_t * 2.0f;              // closing: 1→0
+        float bolt_back = bolt_phase * 0.075f;
+
+        Vector3 bolt_root = Vector3Add(recv, Vector3Scale(cam_dir, -0.02f - bolt_back));
+        bolt_root = Vector3Add(bolt_root, Vector3Scale(cam_up, -0.000f));
+        // Bolt knob sticks left (visible from player's viewpoint)
+        Vector3 bolt_tip = Vector3Add(bolt_root, Vector3Scale(cam_right, -0.065f));
+        DrawCylinderEx(bolt_root, bolt_tip, 0.010f, 0.009f, 6, weapon_light);
+        DrawSphere(bolt_tip, 0.015f, weapon_light);
+    }
+
+    // ── Pistol grip ──
+    {
+        Vector3 grip_top    = Vector3Add(grip, Vector3Scale(cam_up,  -0.006f));
+        Vector3 grip_bottom = Vector3Add(grip_top, Vector3Scale(cam_up,  -0.092f));
+        grip_bottom = Vector3Add(grip_bottom, Vector3Scale(cam_dir, -0.018f));
+        DrawCylinderEx(grip_top, grip_bottom, 0.024f, 0.020f, 8, weapon_dark);
     }
 
     // ── Trigger guard ──
     {
-        Vector3 tg = Vector3Add(vm_origin, Vector3Scale(cam_dir, 0.01f));
-        tg = Vector3Add(tg, Vector3Scale(cam_up_actual, -0.055f));
-        drawOrientedCube(tg, 0.05f, 0.008f, 0.04f, weapon_dark);
+        Vector3 tg = Vector3Add(grip, Vector3Scale(cam_dir,  0.028f));
+        tg = Vector3Add(tg, Vector3Scale(cam_up, -0.026f));
+        drawBox(tg, 0.048f, 0.007f, 0.040f, weapon_dark);
     }
 
-    // ── Muzzle tip ──
+    // ── Stock (extends behind grip) ──
     {
-        Vector3 muzzle = Vector3Add(vm_origin, Vector3Scale(cam_dir, 0.35f));
-        DrawSphere(muzzle, 0.022f, weapon_dark);
+        Vector3 stock_front = Vector3Add(grip, Vector3Scale(cam_dir, -0.07f));
+        stock_front = Vector3Add(stock_front, Vector3Scale(cam_up, 0.010f));
+        Vector3 stock_back  = Vector3Add(stock_front, Vector3Scale(cam_dir, -0.27f));
+        stock_back  = Vector3Add(stock_back, Vector3Scale(cam_up, -0.012f));
+        Vector3 stock_mid   = Vector3Lerp(stock_front, stock_back, 0.5f);
+        drawBox(stock_mid, 0.058f, 0.046f, 0.24f, weapon_col);
+        // Cheek rest (raised ridge on top of stock)
+        Vector3 cheek = Vector3Lerp(stock_front, stock_back, 0.3f);
+        cheek = Vector3Add(cheek, Vector3Scale(cam_up, 0.024f));
+        drawBox(cheek, 0.050f, 0.016f, 0.10f, weapon_dark);
+        // Butt plate
+        Vector3 butt = Vector3Add(stock_back, Vector3Scale(cam_dir, -0.008f));
+        drawBox(butt, 0.064f, 0.064f, 0.016f, weapon_dark);
+    }
 
-        // Muzzle flash on recoil
+    // ── Muzzle device & flash ──
+    {
+        DrawSphere(barrel_end, 0.017f, weapon_dark);
         if (vm_recoil > 0.5f) {
-            float flash_alpha = (vm_recoil - 0.5f) * 2.0f; // 0..1
-            unsigned char fa = (unsigned char)(flash_alpha * 200);
-            Color flash = {255, 200, 50, fa};
-            DrawSphere(muzzle, 0.06f * flash_alpha, flash);
+            float fa = (vm_recoil - 0.5f) * 2.0f;
+            unsigned char a = (unsigned char)(fa * 220);
+            Color flash = {255, 210, 60, a};
+            DrawSphere(barrel_end, 0.09f * fa, flash);
+            Vector3 fl_u = Vector3Add(barrel_end, Vector3Scale(cam_up,    0.12f * fa));
+            Vector3 fl_d = Vector3Add(barrel_end, Vector3Scale(cam_up,   -0.12f * fa));
+            Vector3 fl_r = Vector3Add(barrel_end, Vector3Scale(cam_right,  0.12f * fa));
+            Vector3 fl_l = Vector3Add(barrel_end, Vector3Scale(cam_right, -0.12f * fa));
+            DrawLine3D(fl_u, fl_d, flash);
+            DrawLine3D(fl_r, fl_l, flash);
         }
     }
 
-    // ── Right hand (gripping the weapon) ──
+    // ── Right hand (grip) ──
     {
-        Vector3 hand_pos = Vector3Add(vm_origin, Vector3Scale(cam_dir, -0.03f));
-        hand_pos = Vector3Add(hand_pos, Vector3Scale(cam_up_actual, -0.06f));
-        hand_pos = Vector3Add(hand_pos, Vector3Scale(cam_right, 0.0f));
-
-        // Palm wrapping around grip
-        drawOrientedCube(hand_pos, 0.065f, 0.045f, 0.055f, skin_col);
-
-        // Fingers wrapping forward
-        Vector3 fingers = Vector3Add(hand_pos, Vector3Scale(cam_dir, 0.035f));
-        fingers = Vector3Add(fingers, Vector3Scale(cam_up_actual, 0.01f));
-        drawOrientedCube(fingers, 0.06f, 0.025f, 0.03f, skin_col);
-
-        // Thumb on the side
-        Vector3 thumb = Vector3Add(hand_pos, Vector3Scale(cam_right, -0.035f));
-        thumb = Vector3Add(thumb, Vector3Scale(cam_up_actual, 0.015f));
-        drawOrientedCube(thumb, 0.02f, 0.02f, 0.04f, skin_dark);
+        Vector3 rh = Vector3Add(grip, Vector3Scale(cam_up, -0.052f));
+        drawBox(rh, 0.060f, 0.040f, 0.050f, skin_col);
+        Vector3 rh_f = Vector3Add(rh, Vector3Scale(cam_dir,  0.030f));
+        rh_f = Vector3Add(rh_f, Vector3Scale(cam_up, 0.010f));
+        drawBox(rh_f, 0.056f, 0.020f, 0.026f, skin_col);
+        Vector3 rh_t = Vector3Add(rh, Vector3Scale(cam_right, -0.031f));
+        rh_t = Vector3Add(rh_t, Vector3Scale(cam_up, 0.012f));
+        drawBox(rh_t, 0.016f, 0.016f, 0.032f, skin_dark);
     }
 
     // ── Right forearm ──
     {
-        Vector3 wrist = Vector3Add(vm_origin, Vector3Scale(cam_dir, -0.06f));
-        wrist = Vector3Add(wrist, Vector3Scale(cam_up_actual, -0.08f));
-
-        Vector3 elbow = Vector3Add(wrist, Vector3Scale(cam_right, 0.18f));
-        elbow = Vector3Add(elbow, Vector3Scale(cam_up_actual, -0.12f));
-        elbow = Vector3Add(elbow, Vector3Scale(cam_dir, -0.15f));
-
-        // Sleeve (forearm)
-        DrawCylinderEx(wrist, elbow, 0.035f, 0.04f, 8, sleeve_col);
-
-        // Exposed skin at wrist
-        Vector3 wrist_skin = Vector3Add(wrist, Vector3Scale(cam_dir, 0.01f));
-        DrawCylinderEx(wrist_skin, wrist, 0.032f, 0.035f, 8, skin_col);
+        Vector3 wrist = Vector3Add(grip, Vector3Scale(cam_dir, -0.04f));
+        wrist = Vector3Add(wrist, Vector3Scale(cam_up, -0.072f));
+        Vector3 elbow = Vector3Add(wrist, Vector3Scale(cam_right,  0.16f));
+        elbow = Vector3Add(elbow, Vector3Scale(cam_up,  -0.11f));
+        elbow = Vector3Add(elbow, Vector3Scale(cam_dir, -0.13f));
+        DrawCylinderEx(wrist, elbow, 0.034f, 0.040f, 8, sleeve_col);
+        DrawCylinderEx(Vector3Add(wrist, Vector3Scale(cam_dir, 0.01f)), wrist, 0.031f, 0.034f, 8, skin_col);
     }
 
-    // ── Left hand (supporting the barrel, optional) ──
+    // ── Left hand (fore-stock, further forward than a pistol) ──
     {
-        Vector3 lh_pos = Vector3Add(vm_origin, Vector3Scale(cam_dir, 0.10f));
-        lh_pos = Vector3Add(lh_pos, Vector3Scale(cam_up_actual, -0.03f));
-        lh_pos = Vector3Add(lh_pos, Vector3Scale(cam_right, -0.02f));
-
-        // Palm under barrel
-        drawOrientedCube(lh_pos, 0.06f, 0.035f, 0.05f, skin_col);
-
-        // Fingers curled over
-        Vector3 lfingers = Vector3Add(lh_pos, Vector3Scale(cam_up_actual, 0.025f));
-        drawOrientedCube(lfingers, 0.055f, 0.018f, 0.04f, skin_dark);
+        Vector3 lh = Vector3Add(grip, Vector3Scale(cam_dir,  0.20f));
+        lh = Vector3Add(lh, Vector3Scale(cam_up,    0.008f));
+        lh = Vector3Add(lh, Vector3Scale(cam_right, -0.012f));
+        drawBox(lh, 0.056f, 0.030f, 0.048f, skin_col);
+        Vector3 lh_f = Vector3Add(lh, Vector3Scale(cam_up, 0.022f));
+        drawBox(lh_f, 0.050f, 0.014f, 0.036f, skin_dark);
     }
 
     // ── Left forearm ──
     {
-        Vector3 lh_wrist = Vector3Add(vm_origin, Vector3Scale(cam_dir, 0.08f));
-        lh_wrist = Vector3Add(lh_wrist, Vector3Scale(cam_up_actual, -0.04f));
-        lh_wrist = Vector3Add(lh_wrist, Vector3Scale(cam_right, -0.02f));
+        Vector3 lw = Vector3Add(grip, Vector3Scale(cam_dir,  0.18f));
+        lw = Vector3Add(lw, Vector3Scale(cam_up,    -0.032f));
+        lw = Vector3Add(lw, Vector3Scale(cam_right, -0.012f));
+        Vector3 le = Vector3Add(lw, Vector3Scale(cam_right, -0.18f));
+        le = Vector3Add(le, Vector3Scale(cam_up,  -0.09f));
+        le = Vector3Add(le, Vector3Scale(cam_dir, -0.10f));
+        DrawCylinderEx(lw, le, 0.032f, 0.037f, 8, sleeve_col);
+        DrawCylinderEx(Vector3Add(lw, Vector3Scale(cam_dir, 0.01f)), lw, 0.029f, 0.032f, 8, skin_col);
+    }
 
-        Vector3 lh_elbow = Vector3Add(lh_wrist, Vector3Scale(cam_right, -0.20f));
-        lh_elbow = Vector3Add(lh_elbow, Vector3Scale(cam_up_actual, -0.10f));
-        lh_elbow = Vector3Add(lh_elbow, Vector3Scale(cam_dir, -0.12f));
-
-        DrawCylinderEx(lh_wrist, lh_elbow, 0.033f, 0.038f, 8, sleeve_col);
-
-        Vector3 lw_skin = Vector3Add(lh_wrist, Vector3Scale(cam_dir, 0.01f));
-        DrawCylinderEx(lw_skin, lh_wrist, 0.030f, 0.033f, 8, skin_col);
+    // ── Shell casings (ejected brass, fall with gravity in viewmodel space) ──
+    for (const auto &s : shell_casings_) {
+        float alpha = std::min(s.timer / 0.3f, 1.0f);
+        Color brass = {210, 165, 50, (unsigned char)(alpha * 255)};
+        Vector3 sp = grip;
+        sp = Vector3Add(sp, Vector3Scale(cam_right, s.r));
+        sp = Vector3Add(sp, Vector3Scale(cam_up,    s.u));
+        sp = Vector3Add(sp, Vector3Scale(cam_dir,   s.f));
+        // Tiny cylinder oriented along cam_right (rotating)
+        float rad = s.rot * DEG2RAD;
+        Vector3 axis = Vector3Add(Vector3Scale(cam_right, cosf(rad)), Vector3Scale(cam_up, sinf(rad)));
+        Vector3 case_tip = Vector3Add(sp, Vector3Scale(axis, 0.026f));
+        DrawCylinderEx(sp, case_tip, 0.007f, 0.005f, 6, brass);
     }
 
     EndMode3D();
-
-    // Re-enable depth test for next frame
     rlEnableDepthTest();
 }
 

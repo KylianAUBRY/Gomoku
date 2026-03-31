@@ -102,9 +102,8 @@ SFML et Raylib ne coexistent **jamais** dans le même processus.
 
 | # | Description | Statut |
 |---|-------------|--------|
-| TODO 7 | Refactoriser le visuel de l'arme via une structure pour permettre l'affichage de différentes armes | À faire |
-| TODO 8 | Deux visuels d'arme sélectionnables : Sniper AWP et Shotgun | À faire |
-| TODO 9 | Cartouche qui tombe au sol après un tir | À faire |
+| TODO 7 | nouveau visuel d'arme : Sniper AWP
+| TODO 8 | animation avancée : Cartouche qui tombe au sol après un tir, verrou du fusil qui se deplace apres tir. l'animation doit bloquer toute tentative de placement de pion tant qu'elle n'est pas finie | À faire |
 
 ---
 
