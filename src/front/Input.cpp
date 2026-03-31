@@ -11,6 +11,10 @@ static Cell playerToCell(Player p) {
 
 namespace Input {
 
+// AI cooldown state (solo mode only)
+static bool s_ai_pending = false;
+static std::chrono::high_resolution_clock::time_point s_ai_pending_since;
+
 void handle_menu_input(const sf::Event &event, UIState &current_state,
                        int &menu_selection, const sf::RenderWindow &window) {
   if (const auto *keyPressed = event.getIf<sf::Event::KeyPressed>()) {
@@ -93,6 +97,7 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
       current_state = UIState::MAIN_MENU;
       state.reset();
       suggestion_shown = false;
+      s_ai_pending = false;
     }
   }
 
@@ -111,6 +116,7 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
         if (replay_btn.contains({mx, my})) {
           state.reset();
           suggestion_shown = false;
+          s_ai_pending = false;
         }
         return;
       }
@@ -157,30 +163,10 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
             return;
           }
 
-          // ---- AI TURN (Solo mode only) ----
+          // ---- AI TURN (Solo mode only) — 0.5s cooldown ----
           if (current_state == UIState::PLAYING_SOLO && !state.game_over) {
-            Cell ai_cell = playerToCell(state.current_player);
-
-            auto t_start = std::chrono::high_resolution_clock::now();
-            Move ai_move = gomoku.getBestMove(state.board, ai_cell);
-            auto t_end = std::chrono::high_resolution_clock::now();
-
-            double elapsed_ms =
-                std::chrono::duration<double, std::milli>(t_end - t_start)
-                    .count();
-            state.last_ai_move_time_ms = elapsed_ms;
-
-            state.place_stone(ai_move.col, ai_move.row);
-
-            // Check win after AI move
-            if (Rules::check_win_condition(state, Player::BLACK) ||
-                Rules::check_win_by_capture(state, Player::BLACK) ||
-                Rules::check_win_condition(state, Player::WHITE) ||
-                Rules::check_win_by_capture(state, Player::WHITE)) {
-              state.game_over = true;
-              state.best_move_suggestion = {-1, -1, 0, 0};
-              return;
-            }
+            s_ai_pending = true;
+            s_ai_pending_since = std::chrono::high_resolution_clock::now();
           }
         }
       }
@@ -408,6 +394,33 @@ void process_events(sf::RenderWindow &window, UIState &current_state,
 
   if (current_state == UIState::PLAYING_BENCHMARK && state.benchmark_game != 5) {
     handle_benchmark(state, gomoku);
+  }
+
+  // AI cooldown: fire after 0.5s (solo mode only)
+  if (current_state == UIState::PLAYING_SOLO && s_ai_pending && !state.game_over) {
+    auto now = std::chrono::high_resolution_clock::now();
+    double elapsed_ms = std::chrono::duration<double, std::milli>(now - s_ai_pending_since).count();
+    if (elapsed_ms >= 500.0) {
+      s_ai_pending = false;
+      Cell ai_cell = playerToCell(state.current_player);
+
+      auto t_start = std::chrono::high_resolution_clock::now();
+      Move ai_move = gomoku.getBestMove(state.board, ai_cell);
+      auto t_end = std::chrono::high_resolution_clock::now();
+
+      state.last_ai_move_time_ms =
+          std::chrono::duration<double, std::milli>(t_end - t_start).count();
+
+      state.place_stone(ai_move.col, ai_move.row);
+
+      if (Rules::check_win_condition(state, Player::BLACK) ||
+          Rules::check_win_by_capture(state, Player::BLACK) ||
+          Rules::check_win_condition(state, Player::WHITE) ||
+          Rules::check_win_by_capture(state, Player::WHITE)) {
+        state.game_over = true;
+        state.best_move_suggestion = {-1, -1, 0, 0};
+      }
+    }
   }
 }
 } // namespace Input

@@ -32,6 +32,10 @@ private:
   int menu_selection;
   bool suggestion_shown;
 
+  struct CaptureAnim { int row, col; float timer; };
+  std::vector<CaptureAnim> capture_anims;
+  sf::Clock frame_clock;
+
   // Render operations
   void render_menu();
   void render(const GameState &state);
@@ -42,4 +46,6 @@ private:
   void draw_game_over(const GameState &state, UIState ui_state);
   void draw_history(const GameState &state);
   void draw_best_move(const GameState &state);
+  void update_capture_anims(float dt);
+  void draw_capture_anims();
 };

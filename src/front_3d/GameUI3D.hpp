@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 // Engine headers MUST come before raylib to avoid BLACK/WHITE macro conflicts
 #include "../engine/GameState.hpp"
 #include "../engine/Gomoku.hpp"
@@ -43,6 +45,14 @@ private:
     float vm_bob_time;      // running timer for idle bob
     float vm_recoil;        // recoil amount (decays over time)
 
+    // Capture animations
+    struct CaptureAnim3D { int row, col; float timer; };
+    std::vector<CaptureAnim3D> capture_anims;
+
+    // AI cooldown (solo mode only)
+    bool ai_pending_;
+    std::chrono::high_resolution_clock::time_point ai_pending_since_;
+
     // Camera setup
     void init_camera();
     void update_camera_rotation();
@@ -74,4 +84,5 @@ private:
     void draw_hud(const GameState &state);
     void draw_game_over_overlay(const GameState &state);
     void draw_history(const GameState &state);
+    void draw_capture_anims_3d();
 };

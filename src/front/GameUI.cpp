@@ -1,6 +1,7 @@
 #include "GameUI.hpp"
 #include "../engine/Rules.hpp"
 #include "Input.hpp"
+#include <algorithm>
 #include <iostream>
 
 GameUI::GameUI()
@@ -23,8 +24,25 @@ GameUI::GameUI()
 void GameUI::run(GameState &state, Gomoku &gomoku) {
   while (window.isOpen()) {
 
+    // Snapshot captures and board before processing input
+    uint8_t cap_b_before = state.board.blackCaptures;
+    uint8_t cap_w_before = state.board.whiteCaptures;
+    BitBoard board_snap = state.board;
+
     // Delegate all input logic to Input module
     Input::process_events(window, current_state, menu_selection, state, gomoku, suggestion_shown);
+
+    // Detect newly captured stones and register animations
+    if (state.board.blackCaptures != cap_b_before || state.board.whiteCaptures != cap_w_before) {
+      for (int r = 0; r < 19; r++)
+        for (int c = 0; c < 19; c++)
+          if (board_snap.get(r, c) != EMPTY && state.board.get(r, c) == EMPTY)
+            capture_anims.push_back({r, c, 1.0f});
+    }
+
+    // Update capture animation timers
+    float dt = frame_clock.restart().asSeconds();
+    update_capture_anims(dt);
 
     // Rendering phase
     if (current_state == UIState::MAIN_MENU) {
@@ -84,6 +102,7 @@ void GameUI::render(const GameState &state) {
 
   draw_board();
   draw_stones(state);
+  draw_capture_anims();
 
   if (current_state == UIState::PLAYING_SOLO ||
       current_state == UIState::PLAYING_MULTI ||
@@ -447,6 +466,38 @@ void GameUI::draw_history(const GameState &state) {
     window.draw(line_text);
 
     y_offset += 30.0f;
+  }
+}
+
+void GameUI::update_capture_anims(float dt) {
+  for (auto &a : capture_anims)
+    a.timer -= dt;
+  capture_anims.erase(
+    std::remove_if(capture_anims.begin(), capture_anims.end(),
+      [](const CaptureAnim &a) { return a.timer <= 0.0f; }),
+    capture_anims.end());
+}
+
+void GameUI::draw_capture_anims() {
+  float arm = CELL_SIZE * 0.38f;
+  for (const auto &a : capture_anims) {
+    float cx = MARGIN + a.col * CELL_SIZE;
+    float cy = MARGIN + a.row * CELL_SIZE;
+    sf::Color color(220, 50, 50, (uint8_t)(a.timer * 255));
+
+    sf::RectangleShape bar1(sf::Vector2f(arm * 2.0f, 4.0f));
+    bar1.setOrigin(sf::Vector2f(arm, 2.0f));
+    bar1.setPosition({cx, cy});
+    bar1.setFillColor(color);
+    bar1.setRotation(sf::degrees(45));
+    window.draw(bar1);
+
+    sf::RectangleShape bar2(sf::Vector2f(arm * 2.0f, 4.0f));
+    bar2.setOrigin(sf::Vector2f(arm, 2.0f));
+    bar2.setPosition({cx, cy});
+    bar2.setFillColor(color);
+    bar2.setRotation(sf::degrees(-45));
+    window.draw(bar2);
   }
 }
 

@@ -14,6 +14,7 @@ static constexpr Cell kEmpty = EMPTY;
 #include "rlgl.h"
 
 #include "GameUI3D.hpp"
+#include <algorithm>
 #include <cstdio>
 #include <chrono>
 #include <cmath>
@@ -38,7 +39,8 @@ GameUI3D::GameUI3D()
     : running(true), menu_selection(0), current_state(UI3DState::MAIN_MENU),
       cam_yaw(0.0f), cam_pitch(0.0f),
       hovered_row(-1), hovered_col(-1), has_hover(false),
-      vm_bob_time(0.0f), vm_recoil(0.0f) {
+      vm_bob_time(0.0f), vm_recoil(0.0f),
+      ai_pending_(false) {
     InitWindow(1280, 720, "Gomoku FPS");
     SetTargetFPS(60);
     init_camera();
@@ -101,13 +103,45 @@ void GameUI3D::run(GameState &state, Gomoku &gomoku) {
             update_camera_rotation();
 
             has_hover = raycast_to_board(hovered_row, hovered_col);
+
+            // Snapshot captures and board before processing input
+            uint8_t cap_b_before = state.board.blackCaptures;
+            uint8_t cap_w_before = state.board.whiteCaptures;
+            BitBoard board_snap = state.board;
+
             handle_game_input(state, gomoku);
+
+            // AI cooldown: fire after 0.5s (solo mode only)
+            if (current_state == UI3DState::PLAYING_SOLO && ai_pending_ && !state.game_over) {
+                auto now = std::chrono::high_resolution_clock::now();
+                double elapsed_ms = std::chrono::duration<double, std::milli>(now - ai_pending_since_).count();
+                if (elapsed_ms >= 500.0) {
+                    ai_pending_ = false;
+                    handle_ai_turn(state, gomoku);
+                }
+            }
+
+            // Detect newly captured stones and register animations
+            if (state.board.blackCaptures != cap_b_before || state.board.whiteCaptures != cap_w_before) {
+                for (int r = 0; r < 19; r++)
+                    for (int c = 0; c < 19; c++)
+                        if (board_snap.get(r, c) != kEmpty && state.board.get(r, c) == kEmpty)
+                            capture_anims.push_back({r, c, 1.0f});
+            }
 
             // Viewmodel animation timers
             float dt = GetFrameTime();
             vm_bob_time += dt;
             if (vm_recoil > 0.0f) vm_recoil -= dt * 6.0f;
             if (vm_recoil < 0.0f) vm_recoil = 0.0f;
+
+            // Update capture animation timers
+            for (auto &a : capture_anims)
+                a.timer -= dt;
+            capture_anims.erase(
+                std::remove_if(capture_anims.begin(), capture_anims.end(),
+                    [](const CaptureAnim3D &a) { return a.timer <= 0.0f; }),
+                capture_anims.end());
 
             render_scene(state);
         }
@@ -159,12 +193,15 @@ void GameUI3D::handle_game_input(GameState &state, Gomoku &gomoku) {
         current_state = UI3DState::MAIN_MENU;
         state.reset();
         init_camera();
+        ai_pending_ = false;
         return;
     }
 
     if (state.game_over) {
-        if (IsKeyPressed(KEY_R))
+        if (IsKeyPressed(KEY_R)) {
             state.reset();
+            ai_pending_ = false;
+        }
         return;
     }
 
@@ -181,9 +218,10 @@ void GameUI3D::handle_game_input(GameState &state, Gomoku &gomoku) {
 
                 if (!state.game_over) {
                     if (current_state == UI3DState::PLAYING_SOLO) {
-                        handle_ai_turn(state, gomoku);
-                    }
-                    if (!state.game_over) {
+                        // 0.5s cooldown before AI responds
+                        ai_pending_ = true;
+                        ai_pending_since_ = std::chrono::high_resolution_clock::now();
+                    } else {
                         Cell c = playerToCell(state.current_player);
                         state.best_move_suggestion = gomoku.getBestMove(state.board, c);
                     }
@@ -270,6 +308,7 @@ void GameUI3D::render_scene(const GameState &state) {
     // ── 2D HUD overlay ──
     draw_crosshair();
     draw_hud(state);
+    draw_capture_anims_3d();
     draw_history(state);
 
     if (state.game_over)
@@ -671,6 +710,21 @@ void GameUI3D::draw_game_over_overlay(const GameState &state) {
 
     const char *restart = "Appuyer [R] pour Rejouer";
     DrawText(restart, sw / 2 - MeasureText(restart, 24) / 2, sh / 2 + 50, 24, WHITE);
+}
+
+void GameUI3D::draw_capture_anims_3d() {
+    for (const auto &a : capture_anims) {
+        Vector3 world_pos = boardToWorld(a.row, a.col, 0.6f);
+        Vector2 screen_pos = GetWorldToScreen(world_pos, camera);
+        float arm = 16.0f;
+        Color red = {220, 50, 50, (unsigned char)(a.timer * 255)};
+        Vector2 tl = {screen_pos.x - arm, screen_pos.y - arm};
+        Vector2 br = {screen_pos.x + arm, screen_pos.y + arm};
+        Vector2 tr = {screen_pos.x + arm, screen_pos.y - arm};
+        Vector2 bl = {screen_pos.x - arm, screen_pos.y + arm};
+        DrawLineEx(tl, br, 3.0f, red);
+        DrawLineEx(tr, bl, 3.0f, red);
+    }
 }
 
 void GameUI3D::draw_history(const GameState &state) {
