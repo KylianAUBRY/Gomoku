@@ -87,11 +87,12 @@ static void update_best_move_suggestion(GameState &state, Gomoku &gomoku) {
 
 void handle_game_input(const sf::Event &event, UIState &current_state,
                        GameState &state, const sf::RenderWindow &window,
-                       Gomoku &gomoku) {
+                       Gomoku &gomoku, bool &suggestion_shown) {
   if (const auto *keyPressed = event.getIf<sf::Event::KeyPressed>()) {
     if (keyPressed->scancode == sf::Keyboard::Scancode::Escape) {
-      current_state = UIState::MAIN_MENU; // Back to Menu
-      state.reset();                      // Always reset on exit
+      current_state = UIState::MAIN_MENU;
+      state.reset();
+      suggestion_shown = false;
     }
   }
 
@@ -101,24 +102,23 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
       float my = mouseButton->position.y;
 
       if (state.game_over) {
-        // No replay button in benchmark mode
         if (current_state == UIState::PLAYING_BENCHMARK)
           return;
 
-        // Check replay button click
         sf::FloatRect replay_btn(
             {window.getSize().x / 2.0f - 100, window.getSize().y / 2.0f + 40},
             {200, 60});
         if (replay_btn.contains({mx, my})) {
           state.reset();
+          suggestion_shown = false;
         }
-        return; // Prevent further interactions if game over
+        return;
       }
 
       // In solo mode, only allow the human player (BLACK) to click
       if (current_state == UIState::PLAYING_SOLO &&
           state.current_player != Player::BLACK) {
-        return; // It's the AI's turn, ignore human clicks
+        return;
       }
 
       // Ignore clicks in bot modes
@@ -126,11 +126,27 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
           current_state == UIState::PLAYING_BENCHMARK)
         return;
 
+      // Check Suggestion button click (history panel, y=50, h=35)
+      bool show_btn = (current_state == UIState::PLAYING_MULTI) ||
+                      (current_state == UIState::PLAYING_SOLO &&
+                       state.current_player == Player::BLACK);
+      if (show_btn) {
+        float hist_x = (BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN;
+        sf::FloatRect btn_rect({hist_x + 10.0f, 50.0f}, {230.0f, 35.0f});
+        if (btn_rect.contains({mx, my})) {
+          update_best_move_suggestion(state, gomoku);
+          suggestion_shown = true;
+          return;
+        }
+      }
+
       int grid_x = (mx - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
       int grid_y = (my - MARGIN + CELL_SIZE / 2) / CELL_SIZE;
 
       if (Rules::is_valid_move(state, grid_x, grid_y)) {
         if (state.place_stone(grid_x, grid_y)) {
+          suggestion_shown = false;
+
           // Check win condition after the move
           if (Rules::check_win_condition(state, Player::BLACK) ||
               Rules::check_win_by_capture(state, Player::BLACK) ||
@@ -166,10 +182,6 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
               return;
             }
           }
-
-          // Update best move suggestion for the current player
-          if (true == false)
-            update_best_move_suggestion(state, gomoku);
         }
       }
     }
@@ -376,7 +388,8 @@ static void handle_benchmark(GameState &state, Gomoku &gomoku) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 void process_events(sf::RenderWindow &window, UIState &current_state,
-                    int &menu_selection, GameState &state, Gomoku &gomoku) {
+                    int &menu_selection, GameState &state, Gomoku &gomoku,
+                    bool &suggestion_shown) {
   while (const std::optional<sf::Event> event = window.pollEvent()) {
     if (event->is<sf::Event::Closed>()) {
       window.close();
@@ -385,7 +398,7 @@ void process_events(sf::RenderWindow &window, UIState &current_state,
     if (current_state == UIState::MAIN_MENU) {
       handle_menu_input(*event, current_state, menu_selection, window);
     } else {
-      handle_game_input(*event, current_state, state, window, gomoku);
+      handle_game_input(*event, current_state, state, window, gomoku, suggestion_shown);
     }
   }
 

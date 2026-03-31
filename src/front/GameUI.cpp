@@ -13,6 +13,7 @@ GameUI::GameUI()
   window.setFramerateLimit(60);
   current_state = UIState::MAIN_MENU;
   menu_selection = 0; // Default to Solo
+  suggestion_shown = false;
 
   if (!font.openFromFile("assets/font.ttf")) {
     std::cerr << "Failed to load font from assets/font.ttf" << std::endl;
@@ -23,7 +24,7 @@ void GameUI::run(GameState &state, Gomoku &gomoku) {
   while (window.isOpen()) {
 
     // Delegate all input logic to Input module
-    Input::process_events(window, current_state, menu_selection, state, gomoku);
+    Input::process_events(window, current_state, menu_selection, state, gomoku, suggestion_shown);
 
     // Rendering phase
     if (current_state == UIState::MAIN_MENU) {
@@ -384,6 +385,25 @@ void GameUI::draw_history(const GameState &state) {
   title.setPosition({hist_x + 10.0f, 10.0f});
   window.draw(title);
 
+  // Suggestion button — visible in MULTI and in SOLO on human's turn (BLACK)
+  bool show_btn = !state.game_over &&
+                  ((current_state == UIState::PLAYING_MULTI) ||
+                   (current_state == UIState::PLAYING_SOLO &&
+                    state.current_player == Player::BLACK));
+  if (show_btn) {
+    sf::RectangleShape btn(sf::Vector2f(230.0f, 35.0f));
+    btn.setFillColor(suggestion_shown ? sf::Color(60, 140, 60) : sf::Color(60, 90, 160));
+    btn.setPosition({hist_x + 10.0f, 50.0f});
+    window.draw(btn);
+
+    sf::Text btn_txt(font, suggestion_shown ? "Suggestion active" : "Suggestion", 19);
+    btn_txt.setFillColor(sf::Color::White);
+    btn_txt.setPosition(
+        {hist_x + 10.0f + 115.0f - btn_txt.getGlobalBounds().size.x / 2.0f,
+         57.0f});
+    window.draw(btn_txt);
+  }
+
   // Render recent moves (last 23)
   size_t display_count = 23;
   size_t start_idx = 0;
@@ -391,7 +411,7 @@ void GameUI::draw_history(const GameState &state) {
     start_idx = state.move_history.size() - display_count;
   }
 
-  float y_offset = 60.0f;
+  float y_offset = 100.0f;
   float radius = 10.0f;
   sf::CircleShape stone(radius);
   stone.setOrigin({radius, radius});
@@ -431,6 +451,8 @@ void GameUI::draw_history(const GameState &state) {
 }
 
 void GameUI::draw_best_move(const GameState &state) {
+  if (!suggestion_shown)
+    return;
   if (state.game_over)
     return;
   if (state.best_move_suggestion.row < 0 || state.best_move_suggestion.col < 0)

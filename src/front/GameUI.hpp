@@ -23,12 +23,14 @@ public:
   sf::RenderWindow &getWindow() { return window; }
   UIState &getCurrentState() { return current_state; }
   int &getMenuSelection() { return menu_selection; }
+  bool &getSuggestionShown() { return suggestion_shown; }
 
 private:
   sf::RenderWindow window;
   sf::Font font;
   UIState current_state;
   int menu_selection;
+  bool suggestion_shown;
 
   // Render operations
   void render_menu();
