@@ -5,7 +5,7 @@
 #include <cstdint>
 
 constexpr int SIZE = 19;
-constexpr int DEPTH_LIMIT = 5;
+constexpr int DEPTH_LIMIT = 7;
 constexpr int MOVE_LIMIT = 20; // nb max de coups explorés par noeud dans minimax
 constexpr int RANGE = 1;
 constexpr int BitBoard_SIZE = 6; // ceil(19*19 / 64) = 6
@@ -16,7 +16,7 @@ extern uint64_t zobristTable[SIZE][SIZE][3]; // [row][col][EMPTY=0/BLACK=1/WHITE
 extern uint64_t zobristCaptures[256][2];     // [nb_captures][0=white / 1=black]
 void initZobrist();
 void clearTTv2();
-void clearTTv3();
+void clearTTv();
 
 
 // La TT stocke les scores déjà
@@ -139,8 +139,8 @@ public:
 
 private:
     std::vector<Move> generateMoves(const BitBoard& board, Cell player);
-    Move minimax(int depth, BitBoard& board, Cell player, int alpha, int beta);
-    Move minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta);
+    Move minimax(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase);
+    Move minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase);
     Move minimax3(int depth, BitBoard& board, Cell player, int alpha, int beta);
 };
 

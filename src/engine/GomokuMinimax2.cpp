@@ -33,7 +33,7 @@ static void ttStore(uint64_t hash, int depthRemaining, int score, TTFlag flag)
     e = { hash, score, (int8_t)depthRemaining, flag };
 }
 
-Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta) {
+Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta,int gamePhase) {
     static int historyHeuristic[SIZE][SIZE] = {};
     static Move killerMoves[DEPTH_LIMIT + 2][2] = {};
 
@@ -50,7 +50,7 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
     if (depth > DEPTH_LIMIT || std::abs(board.score) >= 1000000)
         return {-1, -1, board.score, 0};
 
-         // ── Transposition Table : probe ──────────────────────────────────────────
+    // ── Transposition Table : probe ──────────────────────────────────────────
     // depthRemaining : profondeur qu'il reste à explorer depuis ce nœud.
     // Plus c'est grand, plus l'entrée est précieuse (calcul plus profond).
     // On ne sonde pas à depth==0 car on a besoin du coup réel, pas du score.
@@ -62,6 +62,25 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             return {-1, -1, ttScore, 0};
         
     }
+
+    //ÉLAGAGE FUTILE ASYMÉTRIQUE 
+    if (depth >= DEPTH_LIMIT - 2) {
+        int margin = gamePhase * (DEPTH_LIMIT - depth);
+        if (player == WHITE) {
+            // WHITE maximise : si score + margin <= alpha, élaguer
+            if (board.score + margin <= alpha) {
+                ttStore(board.hash, depthRemaining, board.score, TT_UPPER);
+                return {-1, -1, board.score, 0};
+            }
+        } else {
+            // BLACK minimise : si score - margin >= beta, élaguer
+            if (board.score - margin >= beta) {
+                ttStore(board.hash, depthRemaining, board.score, TT_LOWER);
+                return {-1, -1, board.score, 0};
+            }
+        }
+    }
+
 
     uint8_t whiteCapturesBefore = board.whiteCaptures;
     uint8_t blackCapturesBefore = board.blackCaptures;
@@ -109,7 +128,7 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             int scoreBefore = board.score;
             if (makeMove(board, move, WHITE) == 1)
                 continue ; // coup illégal
-            Move eval = minimax2(depth + 1, board, opponent, alpha, beta);
+            Move eval = minimax2(depth + 1, board, opponent, alpha, beta, gamePhase);
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
@@ -140,7 +159,7 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             int scoreBefore = board.score;
             if (makeMove(board, move, BLACK) == 1)
                 continue ; // coup illégal
-            Move eval = minimax2(depth + 1, board, opponent, alpha, beta);
+            Move eval = minimax2(depth + 1, board, opponent, alpha, beta, gamePhase);
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
@@ -172,18 +191,34 @@ Move Gomoku::getBestMove2(BitBoard& board, Cell player) {
     struct timespec start, end;
 
     // Initialise la table Zobrist une seule fois (seed fixe → déterministe)
+     int totalPieces = 0;
+    for (int i = 0; i < BitBoard_SIZE; i++) {
+        totalPieces += __builtin_popcountll(board.white[i]);
+        totalPieces += __builtin_popcountll(board.black[i]);
+    }
+
+    // Déterminer la phase
+    int gamePhase;
+    if (totalPieces < 10) {
+        gamePhase = 50;  // OUVERTURE
+    } else if (totalPieces < 50) {
+        gamePhase = 400;  // MILIEU
+    } else {
+        gamePhase = 700;  // FIN
+    }
+
     initZobrist();
 
-    board.hash = computeFullHash(board);
+    board.hash = computeFullHash(board) ^ 0xAAAAAAAAAAAAAAAAULL;
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    Move bestMove = minimax2(0, board, player, std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
+    Move bestMove = minimax2(0, board, player, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), gamePhase);
     clock_gettime(CLOCK_MONOTONIC, &end);
 
-    double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
-                   (end.tv_nsec - start.tv_nsec) / 1e6;
-    printf("get_best_move2: %.3f ms, move.score : %d, board.score : %d\n", elapsed, bestMove.score, board.score);
+    // double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
+    //                (end.tv_nsec - start.tv_nsec) / 1e6;
+    // printf("get_best_move: %.3f ms, move.score : %d, board.score : %d\n", elapsed, bestMove.score, board.score);
 
     return bestMove;
 }

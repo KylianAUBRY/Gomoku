@@ -159,7 +159,8 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
           }
 
           // Update best move suggestion for the current player
-          update_best_move_suggestion(state, gomoku);
+          if (true == false)
+            update_best_move_suggestion(state, gomoku);
         }
       }
     }
@@ -206,11 +207,7 @@ static void handle_bot_vs_bot(GameState &state, Gomoku &gomoku) {
 
 // ─── Benchmark ────────────────────────────────────────────────────────────────
 
-static void print_benchmark_summary(double bm1_total, int bm1_moves,
-                                     int bm1_wins, double bm2_total,
-                                     int bm2_moves, int bm2_wins,
-                                     double bm1_game_times[4],
-                                     double bm2_game_times[4]) {
+static void print_benchmark_summary(double bm1_total, int bm1_moves, int bm1_wins, double bm2_total, int bm2_moves, int bm2_wins, double bm1_game_times[4], double bm2_game_times[4]) {
   double bm1_avg_move = bm1_moves > 0 ? bm1_total / bm1_moves : 0.0;
   double bm2_avg_move = bm2_moves > 0 ? bm2_total / bm2_moves : 0.0;
 
@@ -267,7 +264,7 @@ static void handle_benchmark(GameState &state, Gomoku &gomoku) {
     bench.reset();
     bench.current_game = 1;
     clearTTv2();
-    clearTTv3();
+    clearTTv();
     printf("[Benchmark] Démarrage — 4 parties en cours...\n");
     fflush(stdout);
   }
@@ -314,8 +311,6 @@ static void handle_benchmark(GameState &state, Gomoku &gomoku) {
     }
 
     bench.current_game++;
-    clearTTv2();
-    clearTTv3();
     state.reset();
     state.benchmark_game = bench.current_game;
     return;

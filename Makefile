@@ -17,8 +17,7 @@ SRCS = src/main.cpp \
        src/engine/Rules.cpp \
        src/engine/GomokuCommon.cpp \
        src/engine/GomokuMinimax.cpp \
-       src/engine/GomokuMinimax2.cpp \
-       src/engine/GomokuMinimax3.cpp
+       src/engine/GomokuMinimax2.cpp
 
 OBJS = $(SRCS:.cpp=.o)
 
