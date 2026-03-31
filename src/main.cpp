@@ -1,8 +1,10 @@
 #include "engine/GameState.hpp"
 #include "engine/Gomoku.hpp"
 #include "front/GameUI.hpp"
+#include "front_3d/GameUI3D.hpp"
 #include <stdio.h>
 #include <time.h>
+#include <string>
 
 int evalTable[262144][2]; // définition uniques
 
@@ -241,15 +243,26 @@ void initEvalTable() {
   }
 }
 
-int main() {
-  initEvalTable();
+int main(int argc, char** argv) {
+  bool use_fps = false;
+  for (int i = 1; i < argc; ++i) {
+    if (std::string(argv[i]) == "--fps") {
+      use_fps = true;
+    }
+  }
 
+  initEvalTable();
 
   Gomoku game;
   GameState state;
-  GameUI ui;
 
-  ui.run(state, game);
+  if (use_fps) {
+    GameUI3D ui;
+    ui.run(state, game);
+  } else {
+    GameUI ui;
+    ui.run(state, game);
+  }
 
   return 0;
 }

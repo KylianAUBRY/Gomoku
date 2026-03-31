@@ -1,0 +1,14 @@
+[cite_start]**Objectif** : Créer une IA capable de battre des joueurs humains au Gomoku[cite: 3, 4].
+
+**Règles du Jeu**
+* [cite_start]**Plateau** : Goban 19x19, nombre de pierres illimité[cite: 20].
+* [cite_start]**Victoire** : Alignement de 5 pierres ou plus [cite: 18][cite_start], ou capture de 10 pierres adverses[cite: 23].
+* [cite_start]**Capture** : Encadrer une paire de pierres adverses[cite: 22, 99]. [cite_start]Uniquement des paires[cite: 102]. [cite_start]Les intersections redeviennent libres[cite: 101]. [cite_start]Interdiction de s'insérer volontairement dans une capture (suicide)[cite: 103].
+* [cite_start]**Fin de partie par capture** : Un alignement de 5 ne gagne que s'il ne peut pas être brisé par une capture immédiate[cite: 25]. [cite_start]Si un joueur a perdu 4 paires et que l'adversaire peut en capturer une 5ème, l'adversaire gagne[cite: 26].
+* [cite_start]**Double-trois interdit** : Interdiction de jouer un coup introduisant deux alignements "trois-libres" simultanés[cite: 28, 113]. [cite_start]Exception : autorisé si généré par une capture[cite: 123].
+
+**Fonctionnalités Requises**
+* [cite_start]Mode IA contre Humain[cite: 45].
+* [cite_start]Mode Humain contre Humain (hotseat) avec suggestion de coups par l'IA[cite: 48].
+* [cite_start]Interface graphique utilisable[cite: 57].
+* [cite_start]Affichage obligatoire d'un chronomètre mesurant le temps de réflexion de l'IA[cite: 66].

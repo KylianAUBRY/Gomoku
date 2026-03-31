@@ -1,11 +1,11 @@
 # Compiler
 CXX = g++
-CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -O3
+CXXFLAGS = -Wall -Wextra -Werror -Wno-missing-field-initializers -std=c++17 -O3
 
 # Include & libraries (assuming homebrew standard location for SFML on mac)
 # If SFML is installed differently, paths will need adjustment.
 INCLUDES = -I/opt/homebrew/include -I./src
-LIBS = -L/opt/homebrew/lib -lsfml-graphics -lsfml-window -lsfml-system
+LIBS = -L/opt/homebrew/lib -lraylib -lsfml-graphics -lsfml-window -lsfml-system
 
 # Binary
 NAME = Gomoku
@@ -14,6 +14,7 @@ NAME = Gomoku
 SRCS = src/main.cpp \
        src/front/GameUI.cpp \
        src/front/Input.cpp \
+       src/front_3d/GameUI3D.cpp \
        src/engine/Rules.cpp \
        src/engine/GomokuCommon.cpp \
        src/engine/GomokuMinimax.cpp \
