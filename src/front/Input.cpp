@@ -51,16 +51,25 @@ void handle_menu_input(const sf::Event &event, UIState &current_state,
       menu_selection = 3;
   }
 
-  // Mouse click logic for menu
+  // Mouse click logic for menu — only act if click is on a visible option rect
   if (const auto *mouseButton = event.getIf<sf::Event::MouseButtonPressed>()) {
     if (mouseButton->button == sf::Mouse::Button::Left) {
-      if (menu_selection == 0)
+      float mx = mouseButton->position.x;
+      float my = mouseButton->position.y;
+      float center_x = window.getSize().x / 2.0f;
+
+      sf::FloatRect solo_rect({center_x - 150, 280}, {300, 50});
+      sf::FloatRect multi_rect({center_x - 200, 370}, {400, 50});
+      sf::FloatRect bot_rect({center_x - 100, 460}, {200, 50});
+      sf::FloatRect bench_rect({center_x - 160, 550}, {320, 50});
+
+      if (solo_rect.contains({mx, my}))
         current_state = UIState::PLAYING_SOLO;
-      else if (menu_selection == 1)
+      else if (multi_rect.contains({mx, my}))
         current_state = UIState::PLAYING_MULTI;
-      else if (menu_selection == 2)
+      else if (bot_rect.contains({mx, my}))
         current_state = UIState::PLAYING_BOT;
-      else if (menu_selection == 3)
+      else if (bench_rect.contains({mx, my}))
         current_state = UIState::PLAYING_BENCHMARK;
     }
   }
