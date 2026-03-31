@@ -10,7 +10,8 @@ GameUI::GameUI()
                                  HISTORY_WIDTH),
                   (unsigned int)((BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN +
                                  100)}), // +100 for bottom HUD bar
-             "Gomoku - Local PvP") {
+             "Gomoku - Local PvP",
+             sf::Style::Titlebar | sf::Style::Close) {
   window.setFramerateLimit(60);
   current_state = UIState::MAIN_MENU;
   menu_selection = 0; // Default to Solo
@@ -298,15 +299,36 @@ void GameUI::draw_hud(const GameState &state) {
        hud_y + 35.0f});
   window.draw(turn_text);
 
-  // Right: Captures
-  sf::Text captures_text(
-      font,
-      "Captures (B: " + std::to_string(state.board.blackCaptures) +
-          " | W: " + std::to_string(state.board.whiteCaptures) + ")",
-      20);
-  captures_text.setFillColor(sf::Color::White);
-  captures_text.setPosition({window.getSize().x - 220.0f, hud_y + 35.0f});
-  window.draw(captures_text);
+  // Right: Captures — black stone + count, white stone + count
+  float cap_x = window.getSize().x - 210.0f;
+  float cap_y = hud_y + 50.0f;
+  float cap_r = 10.0f;
+  sf::CircleShape cap_stone(cap_r);
+  cap_stone.setOrigin({cap_r, cap_r});
+
+  // Black stone
+  cap_stone.setFillColor(sf::Color::Black);
+  cap_stone.setOutlineColor(sf::Color::White);
+  cap_stone.setOutlineThickness(1.5f);
+  cap_stone.setPosition({cap_x, cap_y});
+  window.draw(cap_stone);
+
+  sf::Text cap_black(font, ": " + std::to_string(state.board.blackCaptures) + "/10", 20);
+  cap_black.setFillColor(sf::Color::White);
+  cap_black.setPosition({cap_x + cap_r + 2.0f, cap_y - cap_r - 2.0f});
+  window.draw(cap_black);
+
+  // White stone
+  float cap_x2 = cap_x + 100.0f;
+  cap_stone.setFillColor(sf::Color::White);
+  cap_stone.setOutlineColor(sf::Color(180, 180, 180));
+  cap_stone.setPosition({cap_x2, cap_y});
+  window.draw(cap_stone);
+
+  sf::Text cap_white(font, ": " + std::to_string(state.board.whiteCaptures) + "/10", 20);
+  cap_white.setFillColor(sf::Color::White);
+  cap_white.setPosition({cap_x2 + cap_r + 2.0f, cap_y - cap_r - 2.0f});
+  window.draw(cap_white);
 }
 
 void GameUI::draw_game_over(const GameState &state, UIState ui_state) {
@@ -405,7 +427,8 @@ void GameUI::draw_game_over(const GameState &state, UIState ui_state) {
 void GameUI::draw_history(const GameState &state) {
   float hist_x = (BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN;
   float hist_width = HISTORY_WIDTH;
-  float hist_height = window.getSize().y;
+  float hud_y_limit = (BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN;
+  float hist_height = hud_y_limit; // Stop before HUD so captures text is visible
 
   // Background for history panel
   sf::RectangleShape hist_bg(sf::Vector2f(hist_width, hist_height));
@@ -439,8 +462,8 @@ void GameUI::draw_history(const GameState &state) {
     window.draw(btn_txt);
   }
 
-  // Render recent moves (last 23)
-  size_t display_count = 23;
+  // Render recent moves (last 21)
+  size_t display_count = 21;
   size_t start_idx = 0;
   if (state.move_history.size() > display_count) {
     start_idx = state.move_history.size() - display_count;
@@ -459,10 +482,11 @@ void GameUI::draw_history(const GameState &state) {
     if (mv.player == Player::BLACK) {
       stone.setFillColor(sf::Color::Black);
       stone.setOutlineColor(sf::Color::White);
-      stone.setOutlineThickness(1.0f);
+      stone.setOutlineThickness(1.5f);
     } else {
       stone.setFillColor(sf::Color::White);
-      stone.setOutlineThickness(0.0f);
+      stone.setOutlineColor(sf::Color(160, 160, 160));
+      stone.setOutlineThickness(1.5f);
     }
     window.draw(stone);
 

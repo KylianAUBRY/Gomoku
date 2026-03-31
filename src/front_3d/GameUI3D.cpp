@@ -43,6 +43,7 @@ GameUI3D::GameUI3D()
       ai_pending_(false),
       ai_highlight_row_(-1), ai_highlight_col_(-1), ai_highlight_timer_(0.0f) {
     InitWindow(1280, 720, "Gomoku FPS");
+    ClearWindowState(FLAG_WINDOW_RESIZABLE);
     SetTargetFPS(60);
     init_camera();
 }

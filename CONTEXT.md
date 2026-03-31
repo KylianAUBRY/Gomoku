@@ -95,8 +95,8 @@ SFML et Raylib ne coexistent **jamais** dans le même processus.
 | TODO 2 | Retirer la suggestion d'aide IA pour le joueur automatisée. il faut plutot un bouton "suggestion", une fois cliqué, l'ia présente le meilleur coup en suggestion. c'est au joueur de cliquer sur ce coup pour le valider. il peut tout de meme jouer autre part, c'est juste un affichage comme celui déja concu a ce jour. | FAIT |
 | TODO 3 | Animation de capture : 2 croix rouges à l'emplacement des pierres capturées, durée 1s, disparition en fondu — **en 2D ET en 3D** | FAIT |
 | TODO 4 | Contre l'IA : cooldown 0.5s entre le coup du joueur et la réponse de l'IA | FAIT |
-| TODO 5 | Contre l'IA : le coup joué par l'IA apparaît en surbrillance pendant 0.5s | À faire |
-| TODO 6 | Compteur de captures pour les deux joueurs : affiché `0/10` au départ, +2 par capture | À faire |
+| TODO 5 | Contre l'IA : le coup joué par l'IA apparaît en surbrillance pendant 0.5s | FAIT |
+| TODO 6 | Compteur de captures pour les deux joueurs : affiché `0/10` au départ, +2 par capture | FAIT |
 
 ### 3D uniquement (`src/front_3d/`)
 
