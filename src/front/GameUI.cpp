@@ -526,7 +526,7 @@ void GameUI::draw_ai_highlight() {
   sf::CircleShape ring(radius);
   ring.setOrigin({radius, radius});
   ring.setFillColor(sf::Color::Transparent);
-  ring.setOutlineColor(sf::Color(255, 200, 0, (uint8_t)(alpha * 255)));
+  ring.setOutlineColor(sf::Color(220, 50, 50, (uint8_t)(alpha * 255)));
   ring.setOutlineThickness(3.0f);
   ring.setPosition({MARGIN + ai_highlight_col * CELL_SIZE,
                     MARGIN + ai_highlight_row * CELL_SIZE});

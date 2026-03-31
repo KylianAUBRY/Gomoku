@@ -384,13 +384,13 @@ void GameUI3D::draw_ai_highlight_3d() {
 
     float alpha = ai_highlight_timer_ / 0.5f; // 1.0 -> 0.0
     unsigned char a = (unsigned char)(alpha * 255);
-    Color ring_col = {255, 200, 0, a};
+    Color ring_col = {220, 50, 50, a};
 
     Vector3 pos = boardToWorld(ai_highlight_row_, ai_highlight_col_, 0.08f);
     DrawCircle3D(pos, 0.48f, {0.0f, 0.0f, 1.0f}, 0.0f, ring_col);
     // Second ring slightly larger for visibility
     DrawCircle3D(pos, 0.52f, {0.0f, 0.0f, 1.0f}, 0.0f,
-                 Color{255, 200, 0, (unsigned char)(a / 2)});
+                 Color{220, 50, 50, (unsigned char)(a / 2)});
 }
 
 void GameUI3D::draw_hover_indicator(const GameState &state) {
