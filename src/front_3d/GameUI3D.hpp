@@ -53,6 +53,11 @@ private:
     bool ai_pending_;
     std::chrono::high_resolution_clock::time_point ai_pending_since_;
 
+    // AI last move highlight (solo mode, 0.5s)
+    int   ai_highlight_row_;
+    int   ai_highlight_col_;
+    float ai_highlight_timer_;
+
     // Camera setup
     void init_camera();
     void update_camera_rotation();
@@ -73,6 +78,7 @@ private:
     void render_scene(const GameState &state);
     void draw_board_3d();
     void draw_stones_3d(const GameState &state);
+    void draw_ai_highlight_3d();
     void draw_hover_indicator(const GameState &state);
     void draw_best_move_3d(const GameState &state);
 

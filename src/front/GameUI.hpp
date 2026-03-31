@@ -36,6 +36,11 @@ private:
   std::vector<CaptureAnim> capture_anims;
   sf::Clock frame_clock;
 
+  // AI last move highlight (solo mode, 0.5s)
+  int   ai_highlight_row;
+  int   ai_highlight_col;
+  float ai_highlight_timer;
+
   // Render operations
   void render_menu();
   void render(const GameState &state);
@@ -46,6 +51,7 @@ private:
   void draw_game_over(const GameState &state, UIState ui_state);
   void draw_history(const GameState &state);
   void draw_best_move(const GameState &state);
+  void draw_ai_highlight();
   void update_capture_anims(float dt);
   void draw_capture_anims();
 };

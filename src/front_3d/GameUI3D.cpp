@@ -40,7 +40,8 @@ GameUI3D::GameUI3D()
       cam_yaw(0.0f), cam_pitch(0.0f),
       hovered_row(-1), hovered_col(-1), has_hover(false),
       vm_bob_time(0.0f), vm_recoil(0.0f),
-      ai_pending_(false) {
+      ai_pending_(false),
+      ai_highlight_row_(-1), ai_highlight_col_(-1), ai_highlight_timer_(0.0f) {
     InitWindow(1280, 720, "Gomoku FPS");
     SetTargetFPS(60);
     init_camera();
@@ -143,6 +144,9 @@ void GameUI3D::run(GameState &state, Gomoku &gomoku) {
                     [](const CaptureAnim3D &a) { return a.timer <= 0.0f; }),
                 capture_anims.end());
 
+            // Update AI highlight timer
+            if (ai_highlight_timer_ > 0.0f) ai_highlight_timer_ -= dt;
+
             render_scene(state);
         }
     }
@@ -243,6 +247,9 @@ void GameUI3D::handle_ai_turn(GameState &state, Gomoku &gomoku) {
     state.last_ai_move_time_ms = elapsed_ms;
 
     state.place_stone(ai_move.col, ai_move.row);
+    ai_highlight_row_   = ai_move.row;
+    ai_highlight_col_   = ai_move.col;
+    ai_highlight_timer_ = 0.5f;
     check_game_over(state);
 }
 
@@ -298,6 +305,7 @@ void GameUI3D::render_scene(const GameState &state) {
     BeginMode3D(camera);
     draw_board_3d();
     draw_stones_3d(state);
+    draw_ai_highlight_3d();
     draw_hover_indicator(state);
     draw_best_move_3d(state);
     EndMode3D();
@@ -368,6 +376,21 @@ void GameUI3D::draw_stones_3d(const GameState &state) {
             DrawSphere(pos, STONE_RADIUS, color);
         }
     }
+}
+
+void GameUI3D::draw_ai_highlight_3d() {
+    if (current_state != UI3DState::PLAYING_SOLO) return;
+    if (ai_highlight_timer_ <= 0.0f || ai_highlight_row_ < 0) return;
+
+    float alpha = ai_highlight_timer_ / 0.5f; // 1.0 -> 0.0
+    unsigned char a = (unsigned char)(alpha * 255);
+    Color ring_col = {255, 200, 0, a};
+
+    Vector3 pos = boardToWorld(ai_highlight_row_, ai_highlight_col_, 0.08f);
+    DrawCircle3D(pos, 0.48f, {0.0f, 0.0f, 1.0f}, 0.0f, ring_col);
+    // Second ring slightly larger for visibility
+    DrawCircle3D(pos, 0.52f, {0.0f, 0.0f, 1.0f}, 0.0f,
+                 Color{255, 200, 0, (unsigned char)(a / 2)});
 }
 
 void GameUI3D::draw_hover_indicator(const GameState &state) {

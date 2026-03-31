@@ -15,6 +15,9 @@ GameUI::GameUI()
   current_state = UIState::MAIN_MENU;
   menu_selection = 0; // Default to Solo
   suggestion_shown = false;
+  ai_highlight_row = -1;
+  ai_highlight_col = -1;
+  ai_highlight_timer = 0.0f;
 
   if (!font.openFromFile("assets/font.ttf")) {
     std::cerr << "Failed to load font from assets/font.ttf" << std::endl;
@@ -40,9 +43,21 @@ void GameUI::run(GameState &state, Gomoku &gomoku) {
             capture_anims.push_back({r, c, 1.0f});
     }
 
-    // Update capture animation timers
+    // Detect AI move (new WHITE stone) in solo mode and start highlight
+    if (current_state == UIState::PLAYING_SOLO) {
+      for (int r = 0; r < 19; r++)
+        for (int c = 0; c < 19; c++)
+          if (board_snap.get(r, c) == EMPTY && state.board.get(r, c) == WHITE) {
+            ai_highlight_row   = r;
+            ai_highlight_col   = c;
+            ai_highlight_timer = 0.5f;
+          }
+    }
+
+    // Update timers
     float dt = frame_clock.restart().asSeconds();
     update_capture_anims(dt);
+    if (ai_highlight_timer > 0.0f) ai_highlight_timer -= dt;
 
     // Rendering phase
     if (current_state == UIState::MAIN_MENU) {
@@ -102,6 +117,7 @@ void GameUI::render(const GameState &state) {
 
   draw_board();
   draw_stones(state);
+  draw_ai_highlight();
   draw_capture_anims();
 
   if (current_state == UIState::PLAYING_SOLO ||
@@ -499,6 +515,22 @@ void GameUI::draw_capture_anims() {
     bar2.setRotation(sf::degrees(-45));
     window.draw(bar2);
   }
+}
+
+void GameUI::draw_ai_highlight() {
+  if (current_state != UIState::PLAYING_SOLO) return;
+  if (ai_highlight_timer <= 0.0f || ai_highlight_row < 0) return;
+
+  float alpha = ai_highlight_timer / 0.5f; // 1.0 -> 0.0
+  float radius = CELL_SIZE * 0.46f;
+  sf::CircleShape ring(radius);
+  ring.setOrigin({radius, radius});
+  ring.setFillColor(sf::Color::Transparent);
+  ring.setOutlineColor(sf::Color(255, 200, 0, (uint8_t)(alpha * 255)));
+  ring.setOutlineThickness(3.0f);
+  ring.setPosition({MARGIN + ai_highlight_col * CELL_SIZE,
+                    MARGIN + ai_highlight_row * CELL_SIZE});
+  window.draw(ring);
 }
 
 void GameUI::draw_best_move(const GameState &state) {
