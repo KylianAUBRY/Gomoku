@@ -33,7 +33,7 @@ static void ttStore(uint64_t hash, int depthRemaining, int score, TTFlag flag)
     e = { hash, score, (int8_t)depthRemaining, flag };
 }
 
-Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta,int gamePhase) {
+Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull) {
     static int historyHeuristic[SIZE][SIZE] = {};
     static Move killerMoves[DEPTH_LIMIT + 2][2] = {};
 
@@ -81,6 +81,24 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
         }
     }
 
+    // ── ÉLAGAGE PAR COUP NUL ─────────────────────────────────────────────────
+    // Si passer son tour (coup nul) provoque déjà une coupure beta/alpha,
+    // alors jouer un vrai coup serait encore meilleur → on peut élaguer.
+    // Interdit : racine, profondeur insuffisante, positions quasi-terminales,
+    // et deux coups nuls consécutifs (allowNull).
+    const int NULL_R = 2; // facteur de réduction
+    if (allowNull && depth > 0 && depthRemaining > NULL_R + 1 && std::abs(board.score) < 900000) {
+        Cell nullOpponent = (player == WHITE) ? BLACK : WHITE;
+        Move nullEval = minimax(depth + 1 + NULL_R, board, nullOpponent, alpha, beta, gamePhase, false);
+        if (player == WHITE && nullEval.score >= beta) {
+            ttStore(board.hash, depthRemaining, nullEval.score, TT_LOWER);
+            return {-1, -1, nullEval.score, 0};
+        }
+        if (player == BLACK && nullEval.score <= alpha) {
+            ttStore(board.hash, depthRemaining, nullEval.score, TT_UPPER);
+            return {-1, -1, nullEval.score, 0};
+        }
+    }
 
     uint8_t whiteCapturesBefore = board.whiteCaptures;
     uint8_t blackCapturesBefore = board.blackCaptures;
@@ -214,6 +232,7 @@ Move Gomoku::getBestMove2(BitBoard& board, Cell player) {
 
 
     clock_gettime(CLOCK_MONOTONIC, &start);
+    // Move bestMove = minimax(0, board, player, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), gamePhase);
 
     Move bestMove = minimax2(0, board, player, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), gamePhase);
     clock_gettime(CLOCK_MONOTONIC, &end);
