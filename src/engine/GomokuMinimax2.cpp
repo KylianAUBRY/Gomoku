@@ -3,6 +3,36 @@
 #include <climits>
 #include <vector>
 
+static uint64_t computeFullHash(const BitBoard& board)
+{
+    uint64_t h = 0;
+    for (int r = 0; r < SIZE; r++)
+        for (int c = 0; c < SIZE; c++)
+            h ^= zobristTable[r][c][(int)board.get(r, c)];
+    h ^= zobristCaptures[board.whiteCaptures][0];
+    h ^= zobristCaptures[board.blackCaptures][1];
+    return h;
+}
+
+static bool ttProbe(uint64_t hash, int depthRemaining, int alpha, int beta, int& score)
+{
+    const TTEntry& e = ttTable[hash & TT_MASK];
+    if (e.hash != hash)            return false; // collision ou entrée vide
+    if (e.depth < depthRemaining)  return false; // calculée trop superficiellement
+
+    if (e.flag == TT_EXACT)                     { score = e.score; return true; }
+    if (e.flag == TT_LOWER && e.score >= beta)  { score = e.score; return true; }
+    if (e.flag == TT_UPPER && e.score <= alpha) { score = e.score; return true; }
+    return false;
+}
+
+static void ttStore(uint64_t hash, int depthRemaining, int score, TTFlag flag)
+{
+    TTEntry& e = ttTable[hash & TT_MASK];
+    if (e.hash == hash && e.depth > depthRemaining) return;
+    e = { hash, score, (int8_t)depthRemaining, flag };
+}
+
 Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta) {
     static int historyHeuristic[SIZE][SIZE] = {};
     static Move killerMoves[DEPTH_LIMIT + 2][2] = {};
@@ -20,8 +50,22 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
     if (depth > DEPTH_LIMIT || std::abs(board.score) >= 1000000)
         return {-1, -1, board.score, 0};
 
+         // ── Transposition Table : probe ──────────────────────────────────────────
+    // depthRemaining : profondeur qu'il reste à explorer depuis ce nœud.
+    // Plus c'est grand, plus l'entrée est précieuse (calcul plus profond).
+    // On ne sonde pas à depth==0 car on a besoin du coup réel, pas du score.
+    int depthRemaining = DEPTH_LIMIT - depth;
+    int alphaOrig = alpha; // sauvegardé pour calculer le flag TT en fin de nœud
+    if (depth > 0) {
+        int ttScore;
+        if (ttProbe(board.hash, depthRemaining, alpha, beta, ttScore))
+            return {-1, -1, ttScore, 0};
+        
+    }
+
     uint8_t whiteCapturesBefore = board.whiteCaptures;
     uint8_t blackCapturesBefore = board.blackCaptures;
+    uint64_t hashBefore          = board.hash;
     uint64_t white_board[BitBoard_SIZE];
     uint64_t black_board[BitBoard_SIZE];
     std::memcpy(black_board, board.black, sizeof(board.black));
@@ -56,9 +100,11 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
 
     // if ((int)moves.size() > MOVE_LIMIT)
     //     moves.resize(MOVE_LIMIT);
-
+    Move best;
+    TTFlag ttFlag;
+    bool   cutOff = false;
     if (player == WHITE) {
-        Move best = {-1, -1, std::numeric_limits<int>::min(), 0};
+        best = {-1, -1, std::numeric_limits<int>::min(), 0};
         for (Move& move : moves) {
             int scoreBefore = board.score;
             if (makeMove(board, move, WHITE) == 1)
@@ -68,8 +114,8 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
             board.blackCaptures = blackCapturesBefore;
-            // undoMove(board, move, WHITE);
-            board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
+            board.score = scoreBefore;
+            board.hash = hashBefore;
             if (eval.score > best.score) {
                 best = {move.row, move.col, eval.score, 0};
             }
@@ -78,24 +124,29 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             if (alpha >= beta) {
                 updateKiller(move);
                 historyHeuristic[move.row][move.col] += 1 << (DEPTH_LIMIT - depth);
+                cutOff = true;
                 break; // coupure bêta
             }
         }
-        return best;
+        if (cutOff)
+            ttFlag = TT_LOWER;
+        else if (best.score <= alphaOrig)
+            ttFlag = TT_UPPER;
+        else
+            ttFlag = TT_EXACT;
     } else {
-        Move best = {-1, -1, std::numeric_limits<int>::max(), 0};
+        best = {-1, -1, std::numeric_limits<int>::max(), 0};
         for (Move& move : moves) {
             int scoreBefore = board.score;
             if (makeMove(board, move, BLACK) == 1)
                 continue ; // coup illégal
             Move eval = minimax2(depth + 1, board, opponent, alpha, beta);
-            // undoMove(board, move, BLACK);
-
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
             board.blackCaptures = blackCapturesBefore;
-            board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
+            board.score = scoreBefore;
+            board.hash = hashBefore;
             if (eval.score < best.score) {
                 best = {move.row, move.col, eval.score, 0};
             }
@@ -104,16 +155,24 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             if (alpha >= beta) {
                 updateKiller(move);
                 historyHeuristic[move.row][move.col] += 1 << (DEPTH_LIMIT - depth);
+                cutOff = true;
                 break; // coupure alpha
             }
         }
-        return best;
+        ttFlag = cutOff ? TT_UPPER : TT_EXACT;
     }
+    if (depth > 0)
+        ttStore(board.hash, depthRemaining, best.score, ttFlag);
+    return best;
 }
 
 Move Gomoku::getBestMove2(BitBoard& board, Cell player) {
-    // TODO : implémenter minimax avec évaluation heuristique
-  struct timespec start, end;
+    struct timespec start, end;
+
+    // Initialise la table Zobrist une seule fois (seed fixe → déterministe)
+    initZobrist();
+
+    board.hash = computeFullHash(board);
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 

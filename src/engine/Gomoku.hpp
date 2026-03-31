@@ -12,6 +12,37 @@ constexpr int BitBoard_SIZE = 6; // ceil(19*19 / 64) = 6
 
 extern int evalTable[262144][2];
 
+extern uint64_t zobristTable[SIZE][SIZE][3]; // [row][col][EMPTY=0/BLACK=1/WHITE=2]
+extern uint64_t zobristCaptures[256][2];     // [nb_captures][0=white / 1=black]
+void initZobrist();
+
+
+// La TT stocke les scores déjà
+// calculés pour éviter de re-explorer ces branches.
+enum TTFlag : uint8_t { TT_EXACT = 0, TT_LOWER = 1, TT_UPPER = 2 };
+//  TT_EXACT : score exact — la recherche a exploré tous les coups
+//                sans coupure et le score est entre alpha et beta
+//
+//  TT_LOWER : borne inférieure — vrai score ≥ score stocké
+//                (fail-high WHITE : on a coupé car score ≥ beta,
+//                 on n'a pas exploré toutes les branches, mais on sait
+//                 que le score est au moins aussi bon)
+//
+//  TT_UPPER : borne supérieure — vrai score ≤ score stocké
+//                (fail-low WHITE  : tous les coups étaient ≤ alpha,
+//                 ou coupure BLACK : score ≤ alpha)
+struct TTEntry {
+    uint64_t hash;   // hash complet (vérification anti-collision)
+    int      score;
+    int8_t   depth;  // profondeur restante (DEPTH_LIMIT - current_depth)
+    TTFlag   flag;
+
+};
+
+constexpr size_t TT_SIZE = 1 << 20;
+constexpr size_t TT_MASK = TT_SIZE - 1;
+static TTEntry ttTable[TT_SIZE];
+
 #define MANUAL_CAPTURE_SCORE 15000
 
 // evalTable[i][1] layout:

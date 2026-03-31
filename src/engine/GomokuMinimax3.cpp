@@ -1,146 +1,102 @@
 #include "Gomoku.hpp"
 #include <algorithm>
 #include <climits>
+#include <cstring>
 #include <vector>
 
-// Calcule le score résultant du coup sans modifier le board original.
-// Retourne std::numeric_limits<int>::max() si le coup est illégal (double-trois).
-int get_score(const BitBoard& board, const Move& move, Cell player)
+// =============================================================================
+// ZOBRIST HASHING
+// =============================================================================
+//
+// Tables définies dans GomokuCommon.cpp, déclarées extern dans Gomoku.hpp.
+// makeMove met board.hash à jour en O(1) directement (XOR incrémental).
+// Le hash est restauré en O(1) lors du undo via hashBefore.
+// computeFullHash est appelé une seule fois dans getBestMove2 pour initialiser.
+// =============================================================================
+
+
+// Calcule le hash complet depuis zéro en parcourant tout le plateau.
+// Appelé une seule fois dans getBestMove2, et après chaque makeMove
+// (car makeMove ne met pas board.hash à jour).
+static uint64_t computeFullHash(const BitBoard& board)
 {
-    static const int dirs[4][2] = {{0,1},{1,0},{1,1},{1,-1}};
-    BitBoard tmp = board;
-    int pos = idx(move.row, move.col);
-    int threesBefore = 0, threesAfter = 0;
-    int scoreBefore = tmp.score;
-    int scoreAfter;
-    int toRemove[16][2];
-    int removeCount = 0;
-
-    for (int di = 0; di < 4; di++) {
-        int code = computeLineScore(tmp, move.row, move.col, dirs[di][0], dirs[di][1]);
-        if (player == WHITE)
-            threesBefore += GET_WHITE_THREES(evalTable[code][1]);
-        else
-            threesBefore += GET_BLACK_THREES(evalTable[code][1]);
-        scoreBefore -= evalTable[code][0];
-    }
-
-    if (player == WHITE) setBit(tmp.white, pos);
-    else setBit(tmp.black, pos);
-
-    scoreAfter = scoreBefore;
-    for (int di = 0; di < 4; di++) {
-        int dr = dirs[di][0], dc = dirs[di][1];
-        int code = computeLineScore(tmp, move.row, move.col, dr, dc);
-        int flags = evalTable[code][1];
-
-        if (player == WHITE) {
-            threesAfter += GET_WHITE_THREES(flags);
-            if (GET_WHITE_CAPTURES_UP(flags)) {
-                toRemove[removeCount][0] = move.row + dr;   toRemove[removeCount][1] = move.col + dc;   removeCount++;
-                toRemove[removeCount][0] = move.row + 2*dr; toRemove[removeCount][1] = move.col + 2*dc; removeCount++;
-            }
-            if (GET_WHITE_CAPTURES_DOWN(flags)) {
-                toRemove[removeCount][0] = move.row - dr;   toRemove[removeCount][1] = move.col - dc;   removeCount++;
-                toRemove[removeCount][0] = move.row - 2*dr; toRemove[removeCount][1] = move.col - 2*dc; removeCount++;
-            }
-        } else {
-            threesAfter += GET_BLACK_THREES(flags);
-            if (GET_BLACK_CAPTURES_UP(flags)) {
-                toRemove[removeCount][0] = move.row + dr;   toRemove[removeCount][1] = move.col + dc;   removeCount++;
-                toRemove[removeCount][0] = move.row + 2*dr; toRemove[removeCount][1] = move.col + 2*dc; removeCount++;
-            }
-            if (GET_BLACK_CAPTURES_DOWN(flags)) {
-                toRemove[removeCount][0] = move.row - dr;   toRemove[removeCount][1] = move.col - dc;   removeCount++;
-                toRemove[removeCount][0] = move.row - 2*dr; toRemove[removeCount][1] = move.col - 2*dc; removeCount++;
-            }
-        }
-        scoreAfter += evalTable[code][0];
-    }
-
-    if (threesAfter - threesBefore >= 2)
-        return std::numeric_limits<int>::max(); // coup illégal
-
-    if (removeCount > 0) {
-        scoreAfter = scoreBefore;
-        if (player == WHITE) clearBit(tmp.white, pos);
-        else clearBit(tmp.black, pos);
-        for (int i = 0; i < removeCount; i++) {
-            for (int di = 0; di < 4; di++) {
-                int code = computeLineScore(tmp, move.row, move.col, dirs[di][0], dirs[di][1]);
-                scoreAfter -= evalTable[code][0];
-            }
-        }
-        for (int i = 0; i < removeCount; i++)
-            tmp.set(toRemove[i][0], toRemove[i][1], EMPTY);
-
-        if (player == WHITE) {
-            scoreAfter += MANUAL_CAPTURE_SCORE * removeCount;
-            tmp.whiteCaptures += static_cast<uint8_t>(removeCount);
-            if (tmp.whiteCaptures >= 10) scoreAfter += 1000000;
-            setBit(tmp.white, pos);
-        } else {
-            scoreAfter -= MANUAL_CAPTURE_SCORE * removeCount;
-            tmp.blackCaptures += static_cast<uint8_t>(removeCount);
-            if (tmp.blackCaptures >= 10) scoreAfter -= 1000000;
-            setBit(tmp.black, pos);
-        }
-        for (int i = 0; i < removeCount; i++) {
-            for (int di = 0; di < 4; di++) {
-                int code = computeLineScore(tmp, move.row, move.col, dirs[di][0], dirs[di][1]);
-                scoreAfter += evalTable[code][0];
-            }
-        }
-        for (int di = 0; di < 4; di++) {
-            int dr = dirs[di][0], dc = dirs[di][1];
-            int code = computeLineScore(tmp, move.row, move.col, dr, dc);
-            scoreAfter += evalTable[code][0];
-        }
-    }
-    return scoreAfter;
+    uint64_t h = 0;
+    for (int r = 0; r < SIZE; r++)
+        for (int c = 0; c < SIZE; c++)
+            h ^= zobristTable[r][c][(int)board.get(r, c)];
+    h ^= zobristCaptures[board.whiteCaptures][0];
+    h ^= zobristCaptures[board.blackCaptures][1];
+    return h;
 }
 
-void apply_move(BitBoard& board, const Move& move, Cell player)
+// =============================================================================
+// TRANSPOSITION TABLE (TT)
+// =============================================================================
+//
+// Le même état de jeu peut être atteint par plusieurs chemins différents
+// dans l'arbre minimax (transpositions). La TT stocke les scores déjà
+// calculés pour éviter de re-explorer ces branches.
+//
+// Chaque entrée contient :
+//   hash  : hash complet pour vérifier les collisions.
+//            (la table est indexée par hash % TT_SIZE ; deux positions
+//            différentes peuvent avoir le même index → on vérifie le hash)
+//   score : la valeur calculée
+//   depth : profondeur RESTANTE quand le score a été calculé.
+//            On n'utilise l'entrée que si elle a été calculée au moins
+//            aussi profond que notre recherche actuelle.
+//   flag  : type de borne sur le score
+//
+//     TT_EXACT : score exact — la recherche a exploré tous les coups
+//                sans coupure et le score est entre alpha et beta
+//
+//     TT_LOWER : borne inférieure — vrai score ≥ score stocké
+//                (fail-high WHITE : on a coupé car score ≥ beta,
+//                 on n'a pas exploré toutes les branches, mais on sait
+//                 que le score est au moins aussi bon)
+//
+//     TT_UPPER : borne supérieure — vrai score ≤ score stocké
+//                (fail-low WHITE  : tous les coups étaient ≤ alpha,
+//                 ou coupure BLACK : score ≤ alpha)
+//
+// Utilisation à la sonde :
+//   TT_EXACT             → score utilisable directement
+//   TT_LOWER et score≥β  → coupure bêta  (on peut couper)
+//   TT_UPPER et score≤α  → coupure alpha (on peut couper)
+// =============================================================================
+
+
+// Sonde la TT. Retourne true et écrit dans 'score' si une entrée utilisable
+// est trouvée pour ce hash à cette profondeur.
+static bool ttProbe(uint64_t hash, int depthRemaining, int alpha, int beta, int& score)
 {
-    static const int dirs[4][2] = {{0,1},{1,0},{1,1},{1,-1}};
-    int pos = idx(move.row, move.col);
+    const TTEntry& e = ttTable[hash & TT_MASK];
+    if (e.hash != hash)            return false; // collision ou entrée vide
+    if (e.depth < depthRemaining)  return false; // calculée trop superficiellement
 
-    if (player == WHITE) setBit(board.white, pos);
-    else setBit(board.black, pos);
-
-    for (int di = 0; di < 4; di++) {
-        int dr = dirs[di][0], dc = dirs[di][1];
-        int code = computeLineScore(board, move.row, move.col, dr, dc);
-        int flags = evalTable[code][1];
-        if (player == WHITE) {
-            if (GET_WHITE_CAPTURES_UP(flags)) {
-                board.whiteCaptures += 2;
-                board.set(move.row + dr, move.col + dc, EMPTY);
-                board.set(move.row + 2*dr, move.col + 2*dc, EMPTY);
-            }
-            if (GET_WHITE_CAPTURES_DOWN(flags)) {
-                board.whiteCaptures += 2;
-                board.set(move.row - dr, move.col - dc, EMPTY);
-                board.set(move.row - 2*dr, move.col - 2*dc, EMPTY);
-            }
-        } else {
-            if (GET_BLACK_CAPTURES_UP(flags)) {
-                board.blackCaptures += 2;
-                board.set(move.row + dr, move.col + dc, EMPTY);
-                board.set(move.row + 2*dr, move.col + 2*dc, EMPTY);
-            }
-            if (GET_BLACK_CAPTURES_DOWN(flags)) {
-                board.blackCaptures += 2;
-                board.set(move.row - dr, move.col - dc, EMPTY);
-                board.set(move.row - 2*dr, move.col - 2*dc, EMPTY);
-            }
-        }
-    }
+    if (e.flag == TT_EXACT)                     { score = e.score; return true; }
+    if (e.flag == TT_LOWER && e.score >= beta)  { score = e.score; return true; }
+    if (e.flag == TT_UPPER && e.score <= alpha) { score = e.score; return true; }
+    return false;
 }
 
+// Stocke le résultat dans la TT.
+// Stratégie "depth-preferred" : on remplace une entrée existante seulement
+// si on a calculé plus profond (l'entrée plus profonde est plus précieuse).
+static void ttStore(uint64_t hash, int depthRemaining, int score, TTFlag flag)
+{
+    TTEntry& e = ttTable[hash & TT_MASK];
+    if (e.hash == hash && e.depth > depthRemaining) return;
+    e = { hash, score, (int8_t)depthRemaining, flag };
+}
 
-Move Gomoku::minimax3(int depth, BitBoard& board, Cell player, int alpha, int beta) {
-    static int historyHeuristic[SIZE][SIZE] = {};
+// =============================================================================
+// MINIMAX2 — avec Transposition Table
+// =============================================================================
+
+Move Gomoku::minimax3(int depth, BitBoard& board, Cell player, int alpha, int beta)
+{
+    static int  historyHeuristic[SIZE][SIZE] = {};
     static Move killerMoves[DEPTH_LIMIT + 2][2] = {};
 
     if (depth == 0) {
@@ -156,11 +112,26 @@ Move Gomoku::minimax3(int depth, BitBoard& board, Cell player, int alpha, int be
     if (depth > DEPTH_LIMIT || std::abs(board.score) >= 1000000)
         return {-1, -1, board.score, 0};
 
+    // ── Transposition Table : probe ──────────────────────────────────────────
+    // depthRemaining : profondeur qu'il reste à explorer depuis ce nœud.
+    // Plus c'est grand, plus l'entrée est précieuse (calcul plus profond).
+    // On ne sonde pas à depth==0 car on a besoin du coup réel, pas du score.
+    int depthRemaining = DEPTH_LIMIT - depth;
+    int alphaOrig = alpha; // sauvegardé pour calculer le flag TT en fin de nœud
+    if (depth > 0) {
+        int ttScore;
+        if (ttProbe(board.hash, depthRemaining, alpha, beta, ttScore))
+            return {-1, -1, ttScore, 0};
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     std::vector<Move> moves = generateMoves(board, player);
     Cell opponent = (player == WHITE) ? BLACK : WHITE;
 
-    uint8_t whiteCapturesBefore = board.whiteCaptures;
-    uint8_t blackCapturesBefore = board.blackCaptures;
+    // Sauvegarde de l'état complet avant la boucle de coups
+    uint8_t  whiteCapturesBefore = board.whiteCaptures;
+    uint8_t  blackCapturesBefore = board.blackCaptures;
+    uint64_t hashBefore          = board.hash; // ← clé : on restaure en O(1) après chaque coup
     uint64_t white_board[BitBoard_SIZE];
     uint64_t black_board[BitBoard_SIZE];
     std::memcpy(black_board, board.black, sizeof(board.black));
@@ -170,32 +141,6 @@ Move Gomoku::minimax3(int depth, BitBoard& board, Cell player, int alpha, int be
         return a.row == b.row && a.col == b.col;
     };
 
-    // Move ordering: supprime les coups illégaux, calcule le score réel dans move.score
-    moves.erase(std::remove_if(moves.begin(), moves.end(), [&](Move& move) {
-        int score = get_score(board, move, player);
-        if (score == std::numeric_limits<int>::max())
-            return true; // coup illégal, supprimé
-        move.score = score; // score réel de la position, sans bonus ordering
-        return false;
-    }), moves.end());
-
-    // Tri avec bonus killer/history calculés à la volée, sans polluer move.score
-    auto orderScore = [&](const Move& m) {
-        int s = m.score;
-        if (depth < DEPTH_LIMIT + 2) {
-            if (sameCell(m, killerMoves[depth][0]))      s += 500000;
-            else if (sameCell(m, killerMoves[depth][1])) s += 450000;
-        }
-        return s + historyHeuristic[m.row][m.col];
-    };
-    if (player == WHITE)
-        std::sort(moves.begin(), moves.end(), [&](const Move& a, const Move& b) { return orderScore(a) > orderScore(b); });
-    else
-        std::sort(moves.begin(), moves.end(), [&](const Move& a, const Move& b) { return orderScore(a) < orderScore(b); });
-
-    // if ((int)moves.size() > MOVE_LIMIT)
-    //     moves.resize(MOVE_LIMIT);
-
     auto updateKiller = [&](const Move& m) {
         if (depth >= DEPTH_LIMIT + 2) return;
         if (!sameCell(m, killerMoves[depth][0])) {
@@ -204,71 +149,118 @@ Move Gomoku::minimax3(int depth, BitBoard& board, Cell player, int alpha, int be
         }
     };
 
+    for (Move& move : moves) {
+        if (depth < DEPTH_LIMIT + 2) {
+            if (sameCell(move, killerMoves[depth][0]))
+                move.score += 500000;
+            else if (sameCell(move, killerMoves[depth][1]))
+                move.score += 450000;
+        }
+        move.score += historyHeuristic[move.row][move.col];
+    }
+    std::sort(moves.begin(), moves.end(), [](const Move& a, const Move& b) { return a.score > b.score; });
+
+    Move   best;
+    TTFlag ttFlag;
+    bool   cutOff = false;
+
     if (player == WHITE) {
-        Move best = {-1, -1, std::numeric_limits<int>::min(), 0};
+        best = {-1, -1, std::numeric_limits<int>::min(), 0};
         for (Move& move : moves) {
             int scoreBefore = board.score;
-            board.score = move.score;
-            apply_move(board, move, WHITE);
+            if (makeMove(board, move, WHITE) == 1)
+                continue; // coup illégal
+
             Move eval = minimax3(depth + 1, board, opponent, alpha, beta);
+
+            // Undo complet
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
             board.blackCaptures = blackCapturesBefore;
-            // undoMove(board, move, WHITE);
-            board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
-            if (eval.score > best.score) {
+            board.score         = scoreBefore;
+            board.hash          = hashBefore; // ← undo du hash en O(1)
+
+            if (eval.score > best.score)
                 best = {move.row, move.col, eval.score, 0};
-            }
             if (best.score > alpha)
                 alpha = best.score;
             if (alpha >= beta) {
                 updateKiller(move);
                 historyHeuristic[move.row][move.col] += 1 << (DEPTH_LIMIT - depth);
+                cutOff = true;
                 break; // coupure bêta
             }
         }
-        return best;
+        // Calcul du flag TT :
+        //   cutOff          → fail-high → vrai score ≥ best.score → borne inférieure
+        //   best ≤ alphaOrig → fail-low  → vrai score ≤ best.score → borne supérieure
+        //   sinon           → score exact (toutes les branches explorées)
+        if      (cutOff)                  ttFlag = TT_LOWER;
+        else if (best.score <= alphaOrig) ttFlag = TT_UPPER;
+        else                              ttFlag = TT_EXACT;
+
     } else {
-        Move best = {-1, -1, std::numeric_limits<int>::max(), 0};
+        best = {-1, -1, std::numeric_limits<int>::max(), 0};
         for (Move& move : moves) {
             int scoreBefore = board.score;
-            board.score = move.score;
-            apply_move(board, move, BLACK);
+            if (makeMove(board, move, BLACK) == 1)
+                continue; // coup illégal
+
             Move eval = minimax3(depth + 1, board, opponent, alpha, beta);
-            // undoMove(board, move, BLACK);
 
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
             board.blackCaptures = blackCapturesBefore;
-            board.score = scoreBefore; // reset score to avoid accumulation d'erreurs
-            if (eval.score < best.score) {
+            board.score         = scoreBefore;
+            board.hash          = hashBefore; // ← undo du hash en O(1)
+
+            if (eval.score < best.score)
                 best = {move.row, move.col, eval.score, 0};
-            }
             if (best.score < beta)
                 beta = best.score;
             if (alpha >= beta) {
                 updateKiller(move);
                 historyHeuristic[move.row][move.col] += 1 << (DEPTH_LIMIT - depth);
+                cutOff = true;
                 break; // coupure alpha
             }
         }
-        return best;
+        // Pour le minimiseur :
+        //   cutOff → BLACK a trouvé un score ≤ alpha → WHITE ne laissera pas arriver ici
+        //            → vrai score pourrait être encore plus bas → borne supérieure
+        //   sinon  → toutes les branches explorées → score exact
+        ttFlag = cutOff ? TT_UPPER : TT_EXACT;
     }
+
+    // ── Transposition Table : store ──────────────────────────────────────────
+    // On ne stocke pas la racine (depth==0) : on a besoin du coup, pas du score seul.
+    if (depth > 0)
+        ttStore(board.hash, depthRemaining, best.score, ttFlag);
+    // ─────────────────────────────────────────────────────────────────────────
+
+    return best;
 }
 
-Move Gomoku::getBestMove3(BitBoard& board, Cell player) {
-    // TODO : implémenter minimax avec évaluation heuristique
-  struct timespec start, end;
+Move Gomoku::getBestMove3(BitBoard& board, Cell player)
+{
+    struct timespec start, end;
+
+    // Initialise la table Zobrist une seule fois (seed fixe → déterministe)
+    initZobrist();
+
+    // Calcule le hash complet du board courant depuis zéro.
+    // À partir d'ici, après chaque makeMove on recalcule via computeFullHash,
+    // et après chaque undo on restaure depuis hashBefore.
+    board.hash = computeFullHash(board);
 
     clock_gettime(CLOCK_MONOTONIC, &start);
-
     Move bestMove = minimax3(0, board, player, std::numeric_limits<int>::min(), std::numeric_limits<int>::max());
     clock_gettime(CLOCK_MONOTONIC, &end);
 
     double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
-                   (end.tv_nsec - start.tv_nsec) / 1e6;
+                     (end.tv_nsec - start.tv_nsec) / 1e6;
     printf("get_best_move3: %.3f ms, move.score : %d, board.score : %d\n", elapsed, bestMove.score, board.score);
 
     return bestMove;

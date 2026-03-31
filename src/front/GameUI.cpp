@@ -63,10 +63,17 @@ void GameUI::render_menu() {
   bot.setPosition(
       {window.getSize().x / 2.0f - bot_bounds.size.x / 2.0f, 460.0f});
 
+  sf::Text bench(font, "Benchmark (4 parties)", 40);
+  bench.setFillColor(menu_selection == 3 ? sf::Color::Yellow : sf::Color::White);
+  sf::FloatRect bench_bounds = bench.getGlobalBounds();
+  bench.setPosition(
+      {window.getSize().x / 2.0f - bench_bounds.size.x / 2.0f, 550.0f});
+
   window.draw(title);
   window.draw(solo);
   window.draw(multi);
   window.draw(bot);
+  window.draw(bench);
 
   window.display();
 }
@@ -79,7 +86,8 @@ void GameUI::render(const GameState &state) {
 
   if (current_state == UIState::PLAYING_SOLO ||
       current_state == UIState::PLAYING_MULTI ||
-      current_state == UIState::PLAYING_BOT) {
+      current_state == UIState::PLAYING_BOT ||
+      current_state == UIState::PLAYING_BENCHMARK) {
     draw_best_move(state);
     draw_hud(state);
     draw_history(state);
@@ -194,8 +202,10 @@ void GameUI::draw_hud(const GameState &state) {
     mode_str = "Mode Solo - Esc to Quit";
   else if (current_state == UIState::PLAYING_MULTI)
     mode_str = "Mode Multi - Esc to Quit";
-  else
+  else if (current_state == UIState::PLAYING_BOT)
     mode_str = "Bot vs Bot - Esc to Quit";
+  else
+    mode_str = "Benchmark - Esc to Quit";
   sf::Text info(font, mode_str, 20);
   info.setFillColor(sf::Color::White);
   info.setPosition({20.0f, hud_y + 15.0f});
@@ -215,6 +225,20 @@ void GameUI::draw_hud(const GameState &state) {
     snprintf(buffer, sizeof(buffer), "Moy Bot1(N): %.2f ms  |  Moy Bot2(B): %.2f ms",
              state.black_avg_time_ms, state.white_avg_time_ms);
     sf::Text timer_text(font, buffer, 16);
+    timer_text.setFillColor(sf::Color::Cyan);
+    timer_text.setPosition({20.0f, hud_y + 55.0f});
+    window.draw(timer_text);
+  } else if (current_state == UIState::PLAYING_BENCHMARK) {
+    char buffer[160];
+    int game = state.benchmark_game;
+    if (game >= 1 && game <= 4) {
+      snprintf(buffer, sizeof(buffer),
+               "Partie %d/4  |  Moy getBestMove: %.1f ms  |  Moy getBestMove2: %.1f ms",
+               game, state.black_avg_time_ms, state.white_avg_time_ms);
+    } else {
+      snprintf(buffer, sizeof(buffer), "Benchmark termine — voir le terminal");
+    }
+    sf::Text timer_text(font, buffer, 15);
     timer_text.setFillColor(sf::Color::Cyan);
     timer_text.setPosition({20.0f, hud_y + 55.0f});
     window.draw(timer_text);
@@ -250,6 +274,37 @@ void GameUI::draw_hud(const GameState &state) {
 }
 
 void GameUI::draw_game_over(const GameState &state, UIState ui_state) {
+  // Benchmark done: show a dedicated overlay (no replay button)
+  if (ui_state == UIState::PLAYING_BENCHMARK && state.benchmark_game == 5) {
+    sf::RectangleShape overlay(
+        sf::Vector2f(window.getSize().x, window.getSize().y));
+    overlay.setFillColor(sf::Color(0, 0, 0, 170));
+    window.draw(overlay);
+
+    sf::Text msg(font, "BENCHMARK TERMINE", 48);
+    msg.setFillColor(sf::Color::Yellow);
+    msg.setStyle(sf::Text::Bold);
+    msg.setPosition(
+        {window.getSize().x / 2.0f - msg.getGlobalBounds().size.x / 2.0f,
+         window.getSize().y / 2.0f - 80});
+    window.draw(msg);
+
+    sf::Text sub(font, "Resultats affiches dans le terminal", 26);
+    sub.setFillColor(sf::Color::White);
+    sub.setPosition(
+        {window.getSize().x / 2.0f - sub.getGlobalBounds().size.x / 2.0f,
+         window.getSize().y / 2.0f - 10});
+    window.draw(sub);
+
+    sf::Text esc(font, "Appuyez sur Echap pour revenir au menu", 22);
+    esc.setFillColor(sf::Color(180, 180, 180));
+    esc.setPosition(
+        {window.getSize().x / 2.0f - esc.getGlobalBounds().size.x / 2.0f,
+         window.getSize().y / 2.0f + 40});
+    window.draw(esc);
+    return;
+  }
+
   bool black_wins = Rules::check_win_condition(state, Player::BLACK) ||
                     Rules::check_win_by_capture(state, Player::BLACK);
   bool white_wins = Rules::check_win_condition(state, Player::WHITE) ||

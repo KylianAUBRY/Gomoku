@@ -4,7 +4,7 @@
 #include "../engine/Gomoku.hpp"
 #include <SFML/Graphics.hpp>
 
-enum class UIState { MAIN_MENU, PLAYING_SOLO, PLAYING_MULTI, PLAYING_BOT };
+enum class UIState { MAIN_MENU, PLAYING_SOLO, PLAYING_MULTI, PLAYING_BOT, PLAYING_BENCHMARK };
 
 // Layout constants
 static constexpr float CELL_SIZE = 35.0f;

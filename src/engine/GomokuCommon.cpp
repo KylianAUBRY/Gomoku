@@ -1,7 +1,27 @@
 #include "Gomoku.hpp"
 #include <algorithm>
 #include <climits>
+#include <random>
 #include <vector>
+
+uint64_t zobristTable[SIZE][SIZE][3];
+uint64_t zobristCaptures[256][2];
+static bool zobristInitialized = false;
+
+void initZobrist()
+{
+    if (zobristInitialized)
+        return;
+    std::mt19937_64 rng(0xDEADBEEFCAFEBABEULL);
+    for (int r = 0; r < SIZE; r++)
+        for (int c = 0; c < SIZE; c++)
+            for (int v = 0; v < 3; v++)
+                zobristTable[r][c][v] = rng();
+    for (int n = 0; n < 256; n++)
+        for (int p = 0; p < 2; p++)
+            zobristCaptures[n][p] = rng();
+    zobristInitialized = true;
+}
 
 // Bitboard helpers: 361 bits = 6 x uint64_t (bits 0..360, bit 361..383 inutilisés)
 // static constexpr int TOTAL_BITS = SIZE * SIZE; // 361
@@ -278,13 +298,13 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
           scoreAfter += MANUAL_CAPTURE_SCORE * removeCount;
           board.whiteCaptures += static_cast<uint8_t>(removeCount);
           if (board.whiteCaptures >= 10)
-            scoreAfter += 1000000;
+            scoreAfter += 2000000;
           setBit(board.white, pos);
         } else {
           scoreAfter -= MANUAL_CAPTURE_SCORE * removeCount;
           board.blackCaptures += static_cast<uint8_t>(removeCount);
           if (board.blackCaptures >= 10)
-            scoreAfter -= 1000000;
+            scoreAfter -= 2000000;
           setBit(board.black, pos);
         }
         for (int i = 0; i < removeCount; i++)
@@ -301,5 +321,27 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
         }
     }
     board.score = scoreAfter;
+
+    // ── Zobrist incrémental O(1) ──────────────────────────────────────────────
+    int playerCell = (player == WHITE) ? 2 : 1;
+    int oppCell    = (player == WHITE) ? 1 : 2;
+    int capIdx     = (player == WHITE) ? 0 : 1;
+    // Pierre posée : EMPTY → player
+    board.hash ^= zobristTable[move.row][move.col][0];
+    board.hash ^= zobristTable[move.row][move.col][playerCell];
+    // Pierres capturées : opponent → EMPTY
+    for (int i = 0; i < removeCount; i++) {
+        board.hash ^= zobristTable[toRemove[i][0]][toRemove[i][1]][oppCell];
+        board.hash ^= zobristTable[toRemove[i][0]][toRemove[i][1]][0];
+    }
+    // Compteur de captures
+    if (removeCount > 0) {
+        uint8_t newCap = (player == WHITE) ? board.whiteCaptures : board.blackCaptures;
+        uint8_t oldCap = newCap - static_cast<uint8_t>(removeCount);
+        board.hash ^= zobristCaptures[oldCap][capIdx];
+        board.hash ^= zobristCaptures[newCap][capIdx];
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     return 0;
 }

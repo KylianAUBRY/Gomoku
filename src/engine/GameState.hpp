@@ -29,6 +29,9 @@ struct GameState {
 
   Move best_move_suggestion = {-1, -1, 0, 0};
 
+  // Benchmark mode: 0=not started, 1-4=current game, 5=done
+  int benchmark_game = 0;
+
   std::vector<GameMove> move_history;
 
   void reset() {
@@ -42,6 +45,7 @@ struct GameState {
     white_avg_time_ms = 0.0;
     white_move_count  = 0;
     best_move_suggestion = {-1, -1, 0, 0};
+    benchmark_game = 0;
     move_history.clear();
   }
 

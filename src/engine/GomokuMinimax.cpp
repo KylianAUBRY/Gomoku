@@ -113,6 +113,8 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
 
 Move Gomoku::getBestMove(BitBoard& board, Cell player) {
     // TODO : implémenter minimax avec évaluation heuristique
+    
+    return getBestMove2(board, player);
   struct timespec start, end;
 
     clock_gettime(CLOCK_MONOTONIC, &start);
