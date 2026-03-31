@@ -266,6 +266,8 @@ static void handle_benchmark(GameState &state, Gomoku &gomoku) {
   if (bench.current_game == 0) {
     bench.reset();
     bench.current_game = 1;
+    clearTTv2();
+    clearTTv3();
     printf("[Benchmark] Démarrage — 4 parties en cours...\n");
     fflush(stdout);
   }
@@ -312,6 +314,8 @@ static void handle_benchmark(GameState &state, Gomoku &gomoku) {
     }
 
     bench.current_game++;
+    clearTTv2();
+    clearTTv3();
     state.reset();
     state.benchmark_game = bench.current_game;
     return;

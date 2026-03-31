@@ -243,6 +243,8 @@ Move Gomoku::minimax3(int depth, BitBoard& board, Cell player, int alpha, int be
     return best;
 }
 
+void clearTTv3() { memset(ttTable, 0, sizeof(ttTable)); }
+
 Move Gomoku::getBestMove3(BitBoard& board, Cell player)
 {
     struct timespec start, end;

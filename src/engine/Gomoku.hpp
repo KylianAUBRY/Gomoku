@@ -15,6 +15,8 @@ extern int evalTable[262144][2];
 extern uint64_t zobristTable[SIZE][SIZE][3]; // [row][col][EMPTY=0/BLACK=1/WHITE=2]
 extern uint64_t zobristCaptures[256][2];     // [nb_captures][0=white / 1=black]
 void initZobrist();
+void clearTTv2();
+void clearTTv3();
 
 
 // La TT stocke les scores déjà

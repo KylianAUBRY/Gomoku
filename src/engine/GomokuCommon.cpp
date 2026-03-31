@@ -54,6 +54,9 @@ Gomoku::Gomoku() {
         board.white[i] = 0ULL;
         board.black[i] = 0ULL;
     }
+    board.whiteCaptures = 0;
+    board.blackCaptures = 0;
+    
 }
 
 // Vérifie si une séquence de cases (donnée par ses positions) forme un free-three :
