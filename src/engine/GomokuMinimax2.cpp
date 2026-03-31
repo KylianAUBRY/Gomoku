@@ -209,7 +209,9 @@ Move Gomoku::getBestMove2(BitBoard& board, Cell player) {
 
     initZobrist();
 
-    board.hash = computeFullHash(board) ^ 0xAAAAAAAAAAAAAAAAULL;
+    // board.hash = computeFullHash(board) ^ 0xAAAAAAAAAAAAAAAAULL;
+    board.hash = computeFullHash(board) ^ 0xBBBBBBBBBBBBBBBBULL; // Différent de getBestMove pour éviter les collisions entre les deux bots lors du benchmark
+
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
