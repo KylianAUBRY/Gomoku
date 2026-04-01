@@ -492,8 +492,6 @@ void GameUI::draw_history(const GameState &state) {
 
     // X/Y formatted (Letter and Number based on grid display)
     char col_char = 'A' + mv.x;
-    if (col_char >= 'I')
-      col_char++; // Skip 'I' for display
     std::string coord_str =
         std::string(1, col_char) + "-" + std::to_string(mv.y + 1);
 
