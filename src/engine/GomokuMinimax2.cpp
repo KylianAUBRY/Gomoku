@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <climits>
 #include <vector>
-constexpr int DEPTH_LIMIT2 = DEPTH_LIMIT -2;
+
 static uint64_t computeFullHash(const BitBoard& board)
 {
     uint64_t h = 0;
@@ -33,28 +33,31 @@ static void ttStore(uint64_t hash, int depthRemaining, int score, TTFlag flag)
     e = { hash, score, (int8_t)depthRemaining, flag };
 }
 
-Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull) {
-    static int historyHeuristic[SIZE][SIZE] = {};
-    static Move killerMoves[DEPTH_LIMIT2 + 2][2] = {};
+Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull, int prevRow, int prevCol) {
+    static int  historyHeuristic[SIZE][SIZE] = {};
+    static Move killerMoves[DEPTH_LIMIT + 2][2] = {};
+    static int  countermove[SIZE][SIZE][2] = {}; // [prevRow][prevCol] = {responseRow, responseCol}
 
     if (depth == 0) {
-        for (int row = 0; row < SIZE; row++) {
-            for (int col = 0; col < SIZE; col++)
-            historyHeuristic[row][col] = 0;
-        }
-        for (int d = 0; d < DEPTH_LIMIT2 + 2; d++) {
+        for (int row = 0; row < SIZE; row++)
+            for (int col = 0; col < SIZE; col++) {
+                historyHeuristic[row][col] = 0;
+                countermove[row][col][0] = -1;
+                countermove[row][col][1] = -1;
+            }
+        for (int d = 0; d < DEPTH_LIMIT + 2; d++) {
             killerMoves[d][0] = {-1, -1, 0, 0};
             killerMoves[d][1] = {-1, -1, 0, 0};
         }
     }
-    if (depth > DEPTH_LIMIT2 || std::abs(board.score) >= 1000000)
+    if (depth > DEPTH_LIMIT || (board.score >= 1000000 && player == WHITE) || (board.score <= -1000000 && player == BLACK))
         return {-1, -1, board.score, 0};
 
     // ── Transposition Table : probe ──────────────────────────────────────────
     // depthRemaining : profondeur qu'il reste à explorer depuis ce nœud.
     // Plus c'est grand, plus l'entrée est précieuse (calcul plus profond).
     // On ne sonde pas à depth==0 car on a besoin du coup réel, pas du score.
-    int depthRemaining = DEPTH_LIMIT2 - depth;
+    int depthRemaining = DEPTH_LIMIT - depth;
     int alphaOrig = alpha; // sauvegardé pour calculer le flag TT en fin de nœud
     if (depth > 0) {
         int ttScore;
@@ -64,8 +67,8 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
     }
 
     //ÉLAGAGE FUTILE ASYMÉTRIQUE 
-    if (depth >= DEPTH_LIMIT2 - 2) {
-        int margin = gamePhase * (DEPTH_LIMIT2 - depth);
+    if (depth >= DEPTH_LIMIT - 2) {
+        int margin = gamePhase * (DEPTH_LIMIT - depth);
         if (player == WHITE) {
             // WHITE maximise : si score + margin <= alpha, élaguer
             if (board.score + margin <= alpha) {
@@ -89,7 +92,7 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
     const int NULL_R = 2; // facteur de réduction
     if (allowNull && depth > 0 && depthRemaining > NULL_R + 1 && std::abs(board.score) < 900000) {
         Cell nullOpponent = (player == WHITE) ? BLACK : WHITE;
-        Move nullEval = minimax(depth + 1 + NULL_R, board, nullOpponent, alpha, beta, gamePhase, false);
+        Move nullEval = minimax2(depth + 1 + NULL_R, board, nullOpponent, alpha, beta, gamePhase, false);
         if (player == WHITE && nullEval.score >= beta) {
             ttStore(board.hash, depthRemaining, nullEval.score, TT_LOWER);
             return {-1, -1, nullEval.score, 0};
@@ -117,19 +120,27 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
     };
 
     auto updateKiller = [&](const Move& m) {
-        if (depth >= DEPTH_LIMIT2 + 2) return;
+        if (depth >= DEPTH_LIMIT + 2) return;
         if (!sameCell(m, killerMoves[depth][0])) {
             killerMoves[depth][1] = killerMoves[depth][0];
             killerMoves[depth][0] = m;
         }
+        if (prevRow >= 0) {
+            countermove[prevRow][prevCol][0] = m.row;
+            countermove[prevRow][prevCol][1] = m.col;
+        }
     };
 
     for (Move &move : moves) {
-        if (depth < DEPTH_LIMIT2 + 2) {
+        if (depth < DEPTH_LIMIT + 2) {
             if (sameCell(move, killerMoves[depth][0]))
                 move.score += 500000;
             else if (sameCell(move, killerMoves[depth][1]))
                 move.score += 450000;
+            else if (prevRow >= 0 &&
+                     countermove[prevRow][prevCol][0] == move.row &&
+                     countermove[prevRow][prevCol][1] == move.col)
+                move.score += 400000;
         }
         move.score += historyHeuristic[move.row][move.col];
     }
@@ -137,16 +148,35 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
 
     // if ((int)moves.size() > MOVE_LIMIT)
     //     moves.resize(MOVE_LIMIT);
+    // ── LATE MOVE REDUCTION (LMR) ─────────────────────────────────────────────
+    // Les premiers coups (bien classés) sont explorés à profondeur normale.
+    // Les coups tardifs sont d'abord cherchés à profondeur réduite : si le score
+    // ne bat pas alpha, on évite la recherche complète. Sinon on refait pleine prof.
+    constexpr int LMR_FULL_DEPTH_MOVES = 3; // coups toujours cherchés à pleine profondeur
+    constexpr int LMR_REDUCTION_LIMIT  = 3; // profondeur restante minimale pour activer LMR
+
     Move best;
     TTFlag ttFlag;
     bool   cutOff = false;
     if (player == WHITE) {
         best = {-1, -1, std::numeric_limits<int>::min(), 0};
+        int legalMoveCount = 0;
         for (Move& move : moves) {
             int scoreBefore = board.score;
             if (makeMove(board, move, WHITE) == 1)
                 continue ; // coup illégal
-            Move eval = minimax2(depth + 1, board, opponent, alpha, beta, gamePhase);
+            int lmr = legalMoveCount++;
+
+            Move eval;
+            if (lmr >= LMR_FULL_DEPTH_MOVES && depthRemaining >= LMR_REDUCTION_LIMIT) {
+                int reduction = 1 + lmr / 6; // réduction adaptative
+                eval = minimax2(depth + 1 + reduction, board, opponent, alpha, alpha + 1, gamePhase, true, move.row, move.col);
+                if (eval.score > alpha) // failed high → recherche complète
+                    eval = minimax2(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
+            } else {
+                eval = minimax2(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
+            }
+
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
@@ -160,7 +190,7 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
                 alpha = best.score;
             if (alpha >= beta) {
                 updateKiller(move);
-                historyHeuristic[move.row][move.col] += 1 << (DEPTH_LIMIT2 - depth);
+                historyHeuristic[move.row][move.col] += 1 << (DEPTH_LIMIT - depth);
                 cutOff = true;
                 break; // coupure bêta
             }
@@ -173,11 +203,23 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             ttFlag = TT_EXACT;
     } else {
         best = {-1, -1, std::numeric_limits<int>::max(), 0};
+        int legalMoveCount = 0;
         for (Move& move : moves) {
             int scoreBefore = board.score;
             if (makeMove(board, move, BLACK) == 1)
                 continue ; // coup illégal
-            Move eval = minimax2(depth + 1, board, opponent, alpha, beta, gamePhase);
+            int lmr = legalMoveCount++;
+
+            Move eval;
+            if (lmr >= LMR_FULL_DEPTH_MOVES && depthRemaining >= LMR_REDUCTION_LIMIT) {
+                int reduction = 1 + lmr / 6; // réduction adaptative
+                eval = minimax2(depth + 1 + reduction, board, opponent, beta - 1, beta, gamePhase, true, move.row, move.col);
+                if (eval.score < beta) // failed low → recherche complète
+                    eval = minimax2(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
+            } else {
+                eval = minimax2(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
+            }
+
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
@@ -191,7 +233,7 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
                 beta = best.score;
             if (alpha >= beta) {
                 updateKiller(move);
-                historyHeuristic[move.row][move.col] += 1 << (DEPTH_LIMIT2 - depth);
+                historyHeuristic[move.row][move.col] += 1 << (DEPTH_LIMIT - depth);
                 cutOff = true;
                 break; // coupure alpha
             }
@@ -202,7 +244,6 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
         ttStore(board.hash, depthRemaining, best.score, ttFlag);
     return best;
 }
-
 void clearTTv2() { memset(ttTable, 0, sizeof(ttTable)); }
 
 Move Gomoku::getBestMove2(BitBoard& board, Cell player) {
@@ -237,9 +278,8 @@ Move Gomoku::getBestMove2(BitBoard& board, Cell player) {
     Move bestMove = minimax2(0, board, player, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), gamePhase);
     clock_gettime(CLOCK_MONOTONIC, &end);
 
-    // double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
-    //                (end.tv_nsec - start.tv_nsec) / 1e6;
-    // printf("get_best_move: %.3f ms, move.score : %d, board.score : %d\n", elapsed, bestMove.score, board.score);
-
+    double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
+                   (end.tv_nsec - start.tv_nsec) / 1e6;
+    bestMove.computeTimeMs = (long)elapsed;
     return bestMove;
 }

@@ -279,23 +279,22 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
         undoMove(board, move, player);
         return 1;
     }
-
     if (removeCount > 0) {
         scoreAfter = scoreBefore;
         if (player == WHITE)
             clearBit(board.white, pos);
         else
-            clearBit(board.black, pos);
+            clearBit(board.black, pos); //ici on efface la pierre posée 
         for (int i = 0; i < removeCount; i++)
         {
             for (int di = 0; di < 4; di++) {
-                int code = computeLineScore(board, move.row, move.col, dirs[di][0], dirs[di][1]);
+                int code = computeLineScore(board,toRemove[i][0], toRemove[i][1], dirs[di][0], dirs[di][1]);
                 scoreAfter -= evalTable[code][0];
             }
-        }
+        } //on enleve le score des pierres à capturer avant de les enlever du board
         for (int i = 0; i < removeCount; i++) {
           board.set(toRemove[i][0], toRemove[i][1], EMPTY);
-        }
+        } //on les enleve du board
 
         if (player == WHITE) {
           scoreAfter += MANUAL_CAPTURE_SCORE * removeCount;
@@ -309,11 +308,11 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
           if (board.blackCaptures >= 10)
             scoreAfter -= 5000000;
           setBit(board.black, pos);
-        }
+        } //on donne des point pour la capture et on pose la pierre qui declanche la capture
         for (int i = 0; i < removeCount; i++)
         {
             for (int di = 0; di < 4; di++) {
-                int code = computeLineScore(board, move.row, move.col, dirs[di][0], dirs[di][1]);
+                int code = computeLineScore(board, toRemove[i][0], toRemove[i][1], dirs[di][0], dirs[di][1]);
                 scoreAfter += evalTable[code][0];
             }
         }
@@ -344,7 +343,5 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
         board.hash ^= zobristCaptures[oldCap][capIdx];
         board.hash ^= zobristCaptures[newCap][capIdx];
     }
-    // ─────────────────────────────────────────────────────────────────────────
-
     return 0;
 }

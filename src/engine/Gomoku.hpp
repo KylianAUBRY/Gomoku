@@ -6,7 +6,7 @@
 
 constexpr int SIZE = 19;
 constexpr int DEPTH_LIMIT = 9;
-constexpr int MOVE_LIMIT = 30; // nb max de coups explorés par noeud dans minimax
+constexpr int MOVE_LIMIT = 40; // nb max de coups explorés par noeud dans minimax
 constexpr int RANGE = 1;
 constexpr int BitBoard_SIZE = 6; // ceil(19*19 / 64) = 6
 
@@ -140,7 +140,7 @@ public:
 private:
     std::vector<Move> generateMoves(const BitBoard& board, Cell player);
     Move minimax(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull = true);
-    Move minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull = true);
+    Move minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull = true, int prevRow = -1, int prevCol = -1);
 };
 
 int makeMove(BitBoard& board, const Move& move, Cell player);

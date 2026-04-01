@@ -235,7 +235,7 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
 }
 
 void clearTTv() { memset(ttTable, 0, sizeof(ttTable)); }
-
+#include <unistd.h>
 Move Gomoku::getBestMove(BitBoard& board, Cell player) {
     struct timespec start, end;
 
@@ -261,13 +261,17 @@ Move Gomoku::getBestMove(BitBoard& board, Cell player) {
     board.hash = computeFullHash(board) ^ 0xAAAAAAAAAAAAAAAAULL;
 
     clock_gettime(CLOCK_MONOTONIC, &start);
-
+    printf("board.score : %d\n", board.score);
     Move bestMove = minimax(0, board, player, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), gamePhase);
     clock_gettime(CLOCK_MONOTONIC, &end);
-
+    if(std::abs(bestMove.score) >= 1000000) {
+        printf("Best move found with score %d, which is a winning move for %s\n", bestMove.score, (bestMove.score > 0) ? "WHITE" : "BLACK");
+        std::vector<Move> moves = generateMoves(board, player);
+        printf("number of legal moves: %lu\n", moves.size());
+    }
     double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
                    (end.tv_nsec - start.tv_nsec) / 1e6;
-    printf("get_best_move: %.3f ms, move.score : %d, board.score : %d\n", elapsed, bestMove.score, board.score);
-
+    printf("get_best_move: %.3f ms, move.score : %d, board.score : %d, move.row : %d, move.col : %d\n", elapsed, bestMove.score, board.score, bestMove.row, bestMove.col);
+    bestMove.computeTimeMs = (long)elapsed;
     return bestMove;
 }

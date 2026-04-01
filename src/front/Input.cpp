@@ -312,15 +312,12 @@ static void handle_bot_vs_bot(GameState &state, Gomoku &gomoku) {
   Cell current_cell = playerToCell(state.current_player);
   Move bot_move;
 
-  auto t_start = std::chrono::high_resolution_clock::now();
   if (state.current_player == Player::BLACK)
     bot_move = gomoku.getBestMove2(state.board, current_cell);
   else
     bot_move = gomoku.getBestMove(state.board, current_cell);
-  auto t_end = std::chrono::high_resolution_clock::now();
 
-  double elapsed_ms =
-      std::chrono::duration<double, std::milli>(t_end - t_start).count();
+  double elapsed_ms = (double)bot_move.computeTimeMs;
 
   if (state.current_player == Player::BLACK) {
     state.black_move_count++;
@@ -459,14 +456,11 @@ static void handle_benchmark(GameState &state, Gomoku &gomoku) {
 
   Cell current_cell = playerToCell(state.current_player);
 
-  auto t_start = std::chrono::high_resolution_clock::now();
   Move bot_move = bm1_plays
                       ? gomoku.getBestMove(state.board, current_cell)
                       : gomoku.getBestMove2(state.board, current_cell);
-  auto t_end = std::chrono::high_resolution_clock::now();
 
-  double elapsed_ms =
-      std::chrono::duration<double, std::milli>(t_end - t_start).count();
+  double elapsed_ms = (double)bot_move.computeTimeMs;
 
   if (bm1_plays) {
     bench.cur_bm1_time   += elapsed_ms;
@@ -523,12 +517,9 @@ void process_events(sf::RenderWindow &window, UIState &current_state,
       s_ai_pending = false;
       Cell ai_cell = playerToCell(state.current_player);
 
-      auto t_start = std::chrono::high_resolution_clock::now();
       Move ai_move = gomoku.getBestMove(state.board, ai_cell);
-      auto t_end = std::chrono::high_resolution_clock::now();
 
-      state.last_ai_move_time_ms =
-          std::chrono::duration<double, std::milli>(t_end - t_start).count();
+      state.last_ai_move_time_ms = (double)ai_move.computeTimeMs;
 
       state.place_stone(ai_move.col, ai_move.row);
       apply_win_check(state);
