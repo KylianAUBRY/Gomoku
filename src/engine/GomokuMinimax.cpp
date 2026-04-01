@@ -47,7 +47,7 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
             killerMoves[d][1] = {-1, -1, 0, 0};
         }
     }
-    if (depth > DEPTH_LIMIT || std::abs(board.score) >= 1000000)
+    if (depth > DEPTH_LIMIT || (board.score >= 1000000 && player == WHITE) || (board.score <= -1000000 && player == BLACK))
         return {-1, -1, board.score, 0};
 
     // ── Transposition Table : probe ──────────────────────────────────────────
