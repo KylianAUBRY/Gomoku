@@ -1,7 +1,57 @@
 #include "Rules.hpp"
+#include <vector>
 
 namespace Rules
 {
+
+// Collects positions of a line of 5+ same-colored stones along axis (dx,dy)
+// through (sx,sy). Returns true if >= 5 stones found.
+static bool get_line_positions(const BitBoard &board, Cell player_cell,
+                               int sx, int sy, int dx, int dy,
+                               std::vector<std::pair<int,int>> &out)
+{
+    out.clear();
+    // Rewind to the beginning of the line
+    int x = sx, y = sy;
+    while (in_bounds(x - dx, y - dy) && board.get(y - dy, x - dx) == player_cell)
+    { x -= dx; y -= dy; }
+    // Collect forward
+    while (in_bounds(x, y) && board.get(y, x) == player_cell)
+    { out.push_back({x, y}); x += dx; y += dy; }
+    return (int)out.size() >= 5;
+}
+
+// Returns true if the stone at (x,y) is part of a capturable 2-stone pair,
+// i.e. there exists a direction where: OPP-P-P-EMPTY or EMPTY-P-P-OPP
+// and (x,y) is one of the two P's.
+static bool in_capturable_pair(const BitBoard &board, Cell player_cell,
+                               Cell opp_cell, int x, int y)
+{
+    static const int axes[4][2] = {{1,0},{0,1},{1,1},{1,-1}};
+    for (auto &a : axes)
+    {
+        int dx = a[0], dy = a[1];
+        // (x,y) is the LEFT stone of the pair → right neighbor is also player
+        if (in_bounds(x+dx, y+dy) && board.get(y+dy, x+dx) == player_cell
+            && in_bounds(x-dx, y-dy) && in_bounds(x+2*dx, y+2*dy))
+        {
+            Cell L = board.get(y-dy,   x-dx);
+            Cell R = board.get(y+2*dy, x+2*dx);
+            if ((L == opp_cell && R == EMPTY) || (L == EMPTY && R == opp_cell))
+                return true;
+        }
+        // (x,y) is the RIGHT stone of the pair → left neighbor is also player
+        if (in_bounds(x-dx, y-dy) && board.get(y-dy, x-dx) == player_cell
+            && in_bounds(x-2*dx, y-2*dy) && in_bounds(x+dx, y+dy))
+        {
+            Cell L = board.get(y-2*dy, x-2*dx);
+            Cell R = board.get(y+dy,   x+dx);
+            if ((L == opp_cell && R == EMPTY) || (L == EMPTY && R == opp_cell))
+                return true;
+        }
+    }
+    return false;
+}
 
 bool check_alignment_at(const BitBoard &board, Cell player_cell, int sx, int sy,
                         int dx, int dy)
@@ -32,23 +82,32 @@ bool check_alignment_at(const BitBoard &board, Cell player_cell, int sx, int sy,
 bool check_win_condition(const GameState &state, Player player)
 {
     Cell player_cell = (player == Player::BLACK) ? BLACK : WHITE;
+    Cell opp_cell    = (player == Player::BLACK) ? WHITE : BLACK;
 
-    // Iterate through all placed stones of that player
+    static const int axes[4][2] = {{1,0},{0,1},{1,1},{1,-1}};
+
     for (int y = 0; y < 19; ++y)
     {
         for (int x = 0; x < 19; ++x)
         {
-            if (state.board.get(y, x) == player_cell)
+            if (state.board.get(y, x) != player_cell)
+                continue;
+
+            for (auto &a : axes)
             {
-                // Check all 4 axes: Horizontal, Vertical, Diagonal 1, Diagonal
-                // 2
-                if (check_alignment_at(state.board, player_cell, x, y, 1, 0) ||
-                    check_alignment_at(state.board, player_cell, x, y, 0, 1) ||
-                    check_alignment_at(state.board, player_cell, x, y, 1, 1) ||
-                    check_alignment_at(state.board, player_cell, x, y, 1, -1))
+                std::vector<std::pair<int,int>> line;
+                if (!get_line_positions(state.board, player_cell, x, y, a[0], a[1], line))
+                    continue;
+
+                // If any stone in the line is part of a capturable pair → not a win yet
+                bool breakable = false;
+                for (auto &[lx, ly] : line)
                 {
-                    return true;
+                    if (in_capturable_pair(state.board, player_cell, opp_cell, lx, ly))
+                    { breakable = true; break; }
                 }
+                if (!breakable)
+                    return true;
             }
         }
     }

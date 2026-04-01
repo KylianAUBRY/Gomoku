@@ -56,7 +56,7 @@ Gomoku::Gomoku() {
     }
     board.whiteCaptures = 0;
     board.blackCaptures = 0;
-    
+
 }
 
 // Vérifie si une séquence de cases (donnée par ses positions) forme un free-three :
@@ -301,13 +301,13 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
           scoreAfter += MANUAL_CAPTURE_SCORE * removeCount;
           board.whiteCaptures += static_cast<uint8_t>(removeCount);
           if (board.whiteCaptures >= 10)
-            scoreAfter += 2000000;
+            scoreAfter += 5000000;
           setBit(board.white, pos);
         } else {
           scoreAfter -= MANUAL_CAPTURE_SCORE * removeCount;
           board.blackCaptures += static_cast<uint8_t>(removeCount);
           if (board.blackCaptures >= 10)
-            scoreAfter -= 2000000;
+            scoreAfter -= 5000000;
           setBit(board.black, pos);
         }
         for (int i = 0; i < removeCount; i++)
