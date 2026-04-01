@@ -139,7 +139,7 @@ public:
 
 private:
     std::vector<Move> generateMoves(const BitBoard& board, Cell player);
-    Move minimax(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull = true);
+    Move minimax(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull = true, int prevRow = -1, int prevCol = -1);
     Move minimax2(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull = true, int prevRow = -1, int prevCol = -1);
 };
 

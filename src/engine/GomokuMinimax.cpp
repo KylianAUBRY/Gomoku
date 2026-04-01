@@ -33,15 +33,18 @@ static void ttStore(uint64_t hash, int depthRemaining, int score, TTFlag flag)
     e = { hash, score, (int8_t)depthRemaining, flag };
 }
 
-Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull) {
-    static int historyHeuristic[SIZE][SIZE] = {};
+Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int beta, int gamePhase, bool allowNull, int prevRow, int prevCol) {
+    static int  historyHeuristic[SIZE][SIZE] = {};
     static Move killerMoves[DEPTH_LIMIT + 2][2] = {};
+    static int  countermove[SIZE][SIZE][2] = {}; // [prevRow][prevCol] → {responseRow, responseCol}
 
     if (depth == 0) {
-        for (int row = 0; row < SIZE; row++) {
-            for (int col = 0; col < SIZE; col++)
-            historyHeuristic[row][col] = 0;
-        }
+        for (int row = 0; row < SIZE; row++)
+            for (int col = 0; col < SIZE; col++) {
+                historyHeuristic[row][col] = 0;
+                countermove[row][col][0] = -1;
+                countermove[row][col][1] = -1;
+            }
         for (int d = 0; d < DEPTH_LIMIT + 2; d++) {
             killerMoves[d][0] = {-1, -1, 0, 0};
             killerMoves[d][1] = {-1, -1, 0, 0};
@@ -89,7 +92,7 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
     const int NULL_R = 2; // facteur de réduction
     if (allowNull && depth > 0 && depthRemaining > NULL_R + 1 && std::abs(board.score) < 900000) {
         Cell nullOpponent = (player == WHITE) ? BLACK : WHITE;
-        Move nullEval = minimax(depth + 1 + NULL_R, board, nullOpponent, alpha, beta, gamePhase, false);
+        Move nullEval = minimax(depth + 1 + NULL_R, board, nullOpponent, alpha, beta, gamePhase, false, -1, -1);
         if (player == WHITE && nullEval.score >= beta) {
             ttStore(board.hash, depthRemaining, nullEval.score, TT_LOWER);
             return {-1, -1, nullEval.score, 0};
@@ -122,6 +125,12 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
             killerMoves[depth][1] = killerMoves[depth][0];
             killerMoves[depth][0] = m;
         }
+        // Enregistre le contre-coup : si l'adversaire a joué (prevRow,prevCol)
+        // et que répondre avec m produit une coupure, mémoriser m comme réponse.
+        if (prevRow >= 0) {
+            countermove[prevRow][prevCol][0] = m.row;
+            countermove[prevRow][prevCol][1] = m.col;
+        }
     };
 
     for (Move &move : moves) {
@@ -130,6 +139,12 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
                 move.score += 500000;
             else if (sameCell(move, killerMoves[depth][1]))
                 move.score += 450000;
+            // Bonus contre-coup : contexte du coup adversaire précédent.
+            // Priorité 3 (400k), après les deux killers, avant history.
+            else if (prevRow >= 0 &&
+                     countermove[prevRow][prevCol][0] == move.row &&
+                     countermove[prevRow][prevCol][1] == move.col)
+                move.score += 400000;
         }
         move.score += historyHeuristic[move.row][move.col];
     }
@@ -159,11 +174,11 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
             Move eval;
             if (lmr >= LMR_FULL_DEPTH_MOVES && depthRemaining >= LMR_REDUCTION_LIMIT) {
                 int reduction = 1 + lmr / 6; // réduction adaptative
-                eval = minimax(depth + 1 + reduction, board, opponent, alpha, alpha + 1, gamePhase);
+                eval = minimax(depth + 1 + reduction, board, opponent, alpha, alpha + 1, gamePhase, true, move.row, move.col);
                 if (eval.score > alpha) // failed high → recherche complète
-                    eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase);
+                    eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
             } else {
-                eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase);
+                eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
             }
 
             std::memcpy(board.black, black_board, sizeof(black_board));
@@ -202,11 +217,11 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
             Move eval;
             if (lmr >= LMR_FULL_DEPTH_MOVES && depthRemaining >= LMR_REDUCTION_LIMIT) {
                 int reduction = 1 + lmr / 6; // réduction adaptative
-                eval = minimax(depth + 1 + reduction, board, opponent, beta - 1, beta, gamePhase);
+                eval = minimax(depth + 1 + reduction, board, opponent, beta - 1, beta, gamePhase, true, move.row, move.col);
                 if (eval.score < beta) // failed low → recherche complète
-                    eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase);
+                    eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
             } else {
-                eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase);
+                eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
             }
 
             std::memcpy(board.black, black_board, sizeof(black_board));
