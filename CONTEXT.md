@@ -87,9 +87,13 @@ SFML et Raylib ne coexistent **jamais** dans le même processus.
 
 ## 8. TODO List actuelle
 
-### Debugging
+### apprentissage
 
-TODO 1 : Relire les regles de sujet. Une regle n'est pas respectée. Lorsqu'un joueur effectue une pose de 5 pierres, et que l'adversaire peut capturer une pierre sur cette meme suite le tour suivant, alors la capture doit pouvoir etre possible au prochain tour. Actuellement, ce n'est pas le cas. il faut revoir les regles du sujet dans @en.subject.pdf en detail.
+TODO : LE but est de totalement maitriser la partie technique utilisée pour le front, qu'il s'agisse du 2D ou du 3D. Chaque formules, chaque techno, et tout ce qui se trouve dans le code doit etre parfaitement compris. en se referant au sujet via @en.subject.pdf, se préparer a toute eventualité pour la soutenance du projet.
+
+Rappel : je dois defendre la partie front, pas le moteur IA. Je dois donc etre capable de repondre a toute question concernant le front, et de justifier chaque choix technique.
+
+Objectif : tout apprendre en une nuit.
 ---
 
 ## 9. Décisions d'architecture enregistrées (ADR)
