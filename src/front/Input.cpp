@@ -15,6 +15,139 @@ namespace Input {
 static bool s_ai_pending = false;
 static std::chrono::high_resolution_clock::time_point s_ai_pending_since;
 
+// Endgame capture rule: track a "pending" alignment win.
+// When a player aligns 5 but the opponent can immediately capture from that line,
+// game does not end — the opponent gets exactly one turn to attempt the capture.
+static bool   s_pending_alignment_win = false;
+static Player s_pending_winner        = Player::NONE;
+
+// Returns true if 'opp' can, in one move, capture a pair of 'winner' stones
+// where at least one stone in that pair belongs to winner's 5+ alignment.
+// The capture can be along any axis (not necessarily the alignment axis).
+static bool can_opponent_capture_from_alignment(const GameState &state,
+                                                Player winner, Player opp) {
+    Cell winner_cell = (winner == Player::BLACK) ? BLACK : WHITE;
+    Cell opp_cell    = (opp    == Player::BLACK) ? BLACK : WHITE;
+
+    // Mark all cells that are part of a winning alignment (run of >= 5).
+    bool in_alignment[19][19] = {};
+    const int adirs[4][2] = {{1,0},{0,1},{1,1},{1,-1}};
+
+    for (int y = 0; y < 19; ++y) {
+        for (int x = 0; x < 19; ++x) {
+            if (state.board.get(y, x) != winner_cell) continue;
+            for (auto &d : adirs) {
+                int dx = d[0], dy = d[1];
+                // Only start from the beginning of a run.
+                if (Rules::in_bounds(x - dx, y - dy) &&
+                    state.board.get(y - dy, x - dx) == winner_cell) continue;
+                int len = 0, cx = x, cy = y;
+                while (Rules::in_bounds(cx, cy) &&
+                       state.board.get(cy, cx) == winner_cell) {
+                    ++len; cx += dx; cy += dy;
+                }
+                if (len < 5) continue;
+                cx = x; cy = y;
+                for (int i = 0; i < len; ++i) {
+                    in_alignment[cy][cx] = true;
+                    cx += dx; cy += dy;
+                }
+            }
+        }
+    }
+
+    // For each empty cell P: can opponent play there and capture a pair
+    // that includes at least one alignment cell?
+    // Capture pattern (opp plays at P): P - winner - winner - opp_existing
+    const int cdirs[8][2] = {{1,0},{-1,0},{0,1},{0,-1},
+                             {1,1},{-1,-1},{1,-1},{-1,1}};
+    for (int y = 0; y < 19; ++y) {
+        for (int x = 0; x < 19; ++x) {
+            if (state.board.get(y, x) != EMPTY) continue;
+            for (auto &cd : cdirs) {
+                int dx = cd[0], dy = cd[1];
+                int x1 = x + dx,    y1 = y + dy;
+                int x2 = x + 2*dx,  y2 = y + 2*dy;
+                int x3 = x + 3*dx,  y3 = y + 3*dy;
+                if (!Rules::in_bounds(x1, y1) || !Rules::in_bounds(x2, y2) ||
+                    !Rules::in_bounds(x3, y3)) continue;
+                if (state.board.get(y1, x1) == winner_cell &&
+                    state.board.get(y2, x2) == winner_cell &&
+                    state.board.get(y3, x3) == opp_cell    &&
+                    (in_alignment[y1][x1] || in_alignment[y2][x2]))
+                    return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Unified win check called after every stone placement.
+// Implements the endgame capture rule:
+//   - Alignment win is only immediate if the opponent cannot capture from it.
+//   - If they can, set a "pending" flag and give them one turn.
+//   - On that response turn, if the alignment is still intact → pending winner wins.
+//   - The first validated alignment always takes priority over a later one.
+// Returns true if the game is now over (state.game_over has been set).
+static bool apply_win_check(GameState &state) {
+    // current_player has already been flipped: who just played?
+    Player just_played = (state.current_player == Player::BLACK)
+                             ? Player::WHITE : Player::BLACK;
+    Player next_player = state.current_player;
+
+    if (s_pending_alignment_win) {
+        // just_played had one turn to capture from pending_winner's alignment.
+        if (Rules::check_win_condition(state, s_pending_winner)) {
+            // Still intact — opponent did not break it — pending winner wins.
+            state.game_over = true;
+            state.best_move_suggestion = {-1, -1, 0, 0};
+            s_pending_alignment_win = false;
+            s_pending_winner = Player::NONE;
+            return true;
+        }
+        // Alignment broken. Clear pending and run normal checks for just_played.
+        s_pending_alignment_win = false;
+        s_pending_winner = Player::NONE;
+
+        if (Rules::check_win_by_capture(state, just_played)) {
+            state.game_over = true;
+            state.best_move_suggestion = {-1, -1, 0, 0};
+            return true;
+        }
+        if (Rules::check_win_condition(state, just_played)) {
+            if (!can_opponent_capture_from_alignment(state, just_played, next_player)) {
+                state.game_over = true;
+                state.best_move_suggestion = {-1, -1, 0, 0};
+                return true;
+            }
+            s_pending_alignment_win = true;
+            s_pending_winner = just_played;
+        }
+        return false;
+    }
+
+    // No pending. Check capture win (always immediate — no endgame exception).
+    if (Rules::check_win_by_capture(state, just_played)) {
+        state.game_over = true;
+        state.best_move_suggestion = {-1, -1, 0, 0};
+        return true;
+    }
+
+    // Check alignment win with endgame capture rule.
+    if (Rules::check_win_condition(state, just_played)) {
+        if (!can_opponent_capture_from_alignment(state, just_played, next_player)) {
+            state.game_over = true;
+            state.best_move_suggestion = {-1, -1, 0, 0};
+            return true;
+        }
+        // Opponent can potentially break it — give them exactly one turn.
+        s_pending_alignment_win = true;
+        s_pending_winner = just_played;
+    }
+
+    return false;
+}
+
 void handle_menu_input(const sf::Event &event, UIState &current_state,
                        int &menu_selection, const sf::RenderWindow &window) {
   if (const auto *keyPressed = event.getIf<sf::Event::KeyPressed>()) {
@@ -98,6 +231,8 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
       state.reset();
       suggestion_shown = false;
       s_ai_pending = false;
+      s_pending_alignment_win = false;
+      s_pending_winner = Player::NONE;
     }
   }
 
@@ -117,6 +252,8 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
           state.reset();
           suggestion_shown = false;
           s_ai_pending = false;
+          s_pending_alignment_win = false;
+          s_pending_winner = Player::NONE;
         }
         return;
       }
@@ -153,15 +290,9 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
         if (state.place_stone(grid_x, grid_y)) {
           suggestion_shown = false;
 
-          // Check win condition after the move
-          if (Rules::check_win_condition(state, Player::BLACK) ||
-              Rules::check_win_by_capture(state, Player::BLACK) ||
-              Rules::check_win_condition(state, Player::WHITE) ||
-              Rules::check_win_by_capture(state, Player::WHITE)) {
-            state.game_over = true;
-            state.best_move_suggestion = {-1, -1, 0, 0};
+          // Check win condition after the move (endgame capture rule applied)
+          if (apply_win_check(state))
             return;
-          }
 
           // ---- AI TURN (Solo mode only) — 0.5s cooldown ----
           if (current_state == UIState::PLAYING_SOLO && !state.game_over) {
@@ -202,14 +333,7 @@ static void handle_bot_vs_bot(GameState &state, Gomoku &gomoku) {
   }
 
   state.place_stone(bot_move.col, bot_move.row);
-
-  if (Rules::check_win_condition(state, Player::BLACK) ||
-      Rules::check_win_by_capture(state, Player::BLACK) ||
-      Rules::check_win_condition(state, Player::WHITE) ||
-      Rules::check_win_by_capture(state, Player::WHITE)) {
-    state.game_over = true;
-    state.best_move_suggestion = {-1, -1, 0, 0};
-  }
+  apply_win_check(state);
 }
 
 // ─── Benchmark ────────────────────────────────────────────────────────────────
@@ -319,6 +443,8 @@ static void handle_benchmark(GameState &state, Gomoku &gomoku) {
 
     bench.current_game++;
     state.reset();
+    s_pending_alignment_win = false;
+    s_pending_winner = Player::NONE;
     state.benchmark_game = bench.current_game;
     return;
   }
@@ -361,14 +487,7 @@ static void handle_benchmark(GameState &state, Gomoku &gomoku) {
                                 : 0.0;
 
   state.place_stone(bot_move.col, bot_move.row);
-
-  if (Rules::check_win_condition(state, Player::BLACK) ||
-      Rules::check_win_by_capture(state, Player::BLACK) ||
-      Rules::check_win_condition(state, Player::WHITE) ||
-      Rules::check_win_by_capture(state, Player::WHITE)) {
-    state.game_over = true;
-    state.best_move_suggestion = {-1, -1, 0, 0};
-  }
+  apply_win_check(state);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -412,14 +531,7 @@ void process_events(sf::RenderWindow &window, UIState &current_state,
           std::chrono::duration<double, std::milli>(t_end - t_start).count();
 
       state.place_stone(ai_move.col, ai_move.row);
-
-      if (Rules::check_win_condition(state, Player::BLACK) ||
-          Rules::check_win_by_capture(state, Player::BLACK) ||
-          Rules::check_win_condition(state, Player::WHITE) ||
-          Rules::check_win_by_capture(state, Player::WHITE)) {
-        state.game_over = true;
-        state.best_move_suggestion = {-1, -1, 0, 0};
-      }
+      apply_win_check(state);
     }
   }
 }
