@@ -43,9 +43,17 @@ static std::chrono::high_resolution_clock::time_point s_ai_pending_since;
 // s_pending_alignment_win : true = un joueur a aligné 5, mais l'adversaire
 //   peut tenter une capture. On attend son prochain coup.
 // s_pending_winner : qui a fait l'alignement en attente.
+// s_pending_count  : nombre de pendigs successifs dans la séquence courante.
+//   = 1 → premier pending (normal).
+//   ≥ 2 → double-pending : just_played a répondu et a lui aussi 5 → il gagne.
 // ─────────────────────────────────────────────────────────────────────────────
 static bool   s_pending_alignment_win = false;
 static Player s_pending_winner        = Player::NONE;
+static int    s_pending_count         = 0;
+// Gagnant réel : positionné par apply_win_check dès que state.game_over = true.
+// Évite la re-dérivation ambiguë dans draw_game_over quand les deux joueurs
+// ont 5 pierres simultanément sur le plateau (cas pending + réponse alignement).
+static Player s_game_winner           = Player::NONE;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // can_opponent_capture_from_alignment
@@ -130,8 +138,12 @@ static bool can_opponent_capture_from_alignment(const GameState &state,
 //   → "qui vient de jouer" = NOT current_player = l'autre.
 //
 // Cas 1 — Un pending existe (l'adversaire a eu sa chance) :
-//   Si l'alignement est encore intact → le pending_winner gagne.
-//   Si l'alignement a été brisé → on reprend le flux normal pour just_played.
+//   1a. Victoire par capture de just_played → toujours immédiate, prioritaire.
+//   1b. L'alignement du pending_winner est intact :
+//       - Double-pending (s_pending_count ≥ 2) ET just_played a aussi 5
+//         → just_played gagne ("en position de victoire à son tour").
+//       - Sinon → pending_winner gagne normalement.
+//   1c. L'alignement a été brisé → flux normal pour just_played.
 //
 // Cas 2 — Pas de pending :
 //   a) Victoire par capture : toujours immédiate (pas de règle endgame).
@@ -147,57 +159,90 @@ static bool apply_win_check(GameState &state) {
     Player next_player = state.current_player; // Qui joue maintenant
 
     if (s_pending_alignment_win) {
-        // just_played avait une chance de briser l'alignement de s_pending_winner.
-        if (Rules::check_win_condition(state, s_pending_winner)) {
-            // L'alignement est intact → le pending_winner gagne
-            state.game_over = true;
+        // 1a. Victoire par capture : toujours immédiate, même en pending.
+        if (Rules::check_win_by_capture(state, just_played)) {
+            state.game_over            = true;
             state.best_move_suggestion = {-1, -1, 0, 0};
-            s_pending_alignment_win = false;
-            s_pending_winner = Player::NONE;
+            s_game_winner              = just_played;
+            s_pending_alignment_win    = false;
+            s_pending_winner           = Player::NONE;
+            s_pending_count            = 0;
             return true;
         }
-        // L'alignement a été brisé. Annuler le pending et vérifier
+
+        // 1b. just_played avait une chance de briser l'alignement de s_pending_winner.
+        if (Rules::check_win_condition(state, s_pending_winner)) {
+            // Double-pending : just_played a répondu en alignant 5 à son tour → il gagne.
+            // Règle : "si le joueur se retrouve en position de victoire à son tour, il a gagné."
+            if (s_pending_count >= 2 && Rules::check_win_condition(state, just_played)) {
+                state.game_over            = true;
+                state.best_move_suggestion = {-1, -1, 0, 0};
+                s_game_winner              = just_played;
+                s_pending_alignment_win    = false;
+                s_pending_winner           = Player::NONE;
+                s_pending_count            = 0;
+                return true;
+            }
+            // L'alignement est intact → le pending_winner gagne normalement.
+            state.game_over            = true;
+            state.best_move_suggestion = {-1, -1, 0, 0};
+            s_game_winner              = s_pending_winner;
+            s_pending_alignment_win    = false;
+            s_pending_winner           = Player::NONE;
+            s_pending_count            = 0;
+            return true;
+        }
+
+        // 1c. L'alignement a été brisé. Annuler le pending et vérifier
         // si just_played a lui-même une victoire (capture ou alignment).
         s_pending_alignment_win = false;
-        s_pending_winner = Player::NONE;
+        s_pending_winner        = Player::NONE;
+        s_pending_count         = 0;
 
         if (Rules::check_win_by_capture(state, just_played)) {
-            state.game_over = true;
+            state.game_over            = true;
             state.best_move_suggestion = {-1, -1, 0, 0};
+            s_game_winner              = just_played;
             return true;
         }
         if (Rules::check_win_condition(state, just_played)) {
             if (!can_opponent_capture_from_alignment(state, just_played, next_player)) {
-                state.game_over = true;
+                state.game_over            = true;
                 state.best_move_suggestion = {-1, -1, 0, 0};
+                s_game_winner              = just_played;
                 return true;
             }
-            // L'adversaire peut encore tenter de briser ce nouvel alignement
+            // L'adversaire peut encore tenter de briser ce nouvel alignement.
+            // s_pending_count ≥ 2 : marque un double-pending (ou au-delà).
             s_pending_alignment_win = true;
-            s_pending_winner = just_played;
+            s_pending_winner        = just_played;
+            s_pending_count         = 2;
         }
         return false;
     }
 
-    // Pas de pending — flux normal
-    // Victoire par capture : immédiate, sans exception endgame
+    // Cas 2 — Pas de pending — flux normal.
+    // Victoire par capture : immédiate, sans exception endgame.
     if (Rules::check_win_by_capture(state, just_played)) {
-        state.game_over = true;
+        state.game_over            = true;
         state.best_move_suggestion = {-1, -1, 0, 0};
+        s_game_winner              = just_played;
         return true;
     }
 
-    // Victoire par alignement avec règle endgame
+    // Victoire par alignement avec règle endgame.
     if (Rules::check_win_condition(state, just_played)) {
         if (!can_opponent_capture_from_alignment(state, just_played, next_player)) {
-            // Personne ne peut briser l'alignement → victoire immédiate
-            state.game_over = true;
+            // Personne ne peut briser l'alignement → victoire immédiate.
+            state.game_over            = true;
             state.best_move_suggestion = {-1, -1, 0, 0};
+            s_game_winner              = just_played;
             return true;
         }
-        // L'adversaire peut tenter de briser → il a exactement un tour
+        // L'adversaire peut tenter de briser → il a exactement un tour.
         s_pending_alignment_win = true;
-        s_pending_winner = just_played;
+        s_pending_winner        = just_played;
+        s_pending_count         = 1;
     }
 
     return false;
@@ -301,9 +346,11 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
       current_state = UIState::MAIN_MENU;
       state.reset();
       suggestion_shown = false;
-      s_ai_pending = false;
+      s_ai_pending            = false;
       s_pending_alignment_win = false;
-      s_pending_winner = Player::NONE;
+      s_pending_winner        = Player::NONE;
+      s_pending_count         = 0;
+      s_game_winner           = Player::NONE;
     }
   }
 
@@ -323,9 +370,11 @@ void handle_game_input(const sf::Event &event, UIState &current_state,
         if (replay_btn.contains({mx, my})) {
           state.reset();
           suggestion_shown = false;
-          s_ai_pending = false;
+          s_ai_pending            = false;
           s_pending_alignment_win = false;
-          s_pending_winner = Player::NONE;
+          s_pending_winner        = Player::NONE;
+          s_pending_count         = 0;
+          s_game_winner           = Player::NONE;
         }
         return;
       }
@@ -527,7 +576,9 @@ static void handle_benchmark(GameState &state, Gomoku &gomoku) {
     bench.current_game++;
     state.reset();
     s_pending_alignment_win = false;
-    s_pending_winner = Player::NONE;
+    s_pending_winner        = Player::NONE;
+    s_pending_count         = 0;
+    s_game_winner           = Player::NONE;
     state.benchmark_game = bench.current_game;
     return;
   }
@@ -628,4 +679,8 @@ void process_events(sf::RenderWindow &window, UIState &current_state,
     }
   }
 }
+Player get_winner() {
+    return s_game_winner;
+}
+
 } // namespace Input

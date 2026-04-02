@@ -85,19 +85,14 @@ void draw_hud(const GameState& state, UI3DState current_state,
 // Overlay noir semi-transparent (alpha=150) + message vainqueur + dernier
 // temps IA (Solo) + instruction [R] pour rejouer.
 // ─────────────────────────────────────────────────────────────────────────────
-void draw_game_over_overlay(const GameState& state, UI3DState current_state) {
+void draw_game_over_overlay(const GameState& state, UI3DState current_state, Player winner) {
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
     DrawRectangle(0, 0, sw, sh, {0, 0, 0, 150});
 
-    bool black_wins = Rules::check_win_condition(state, makePlayerBlack()) ||
-                      Rules::check_win_by_capture(state, makePlayerBlack());
-    bool white_wins = Rules::check_win_condition(state, makePlayerWhite()) ||
-                      Rules::check_win_by_capture(state, makePlayerWhite());
-
     const char* msg = "GAME OVER";
-    if (black_wins)      msg = "NOIR GAGNE!";
-    else if (white_wins) msg = "BLANC GAGNE!";
+    if (isBlackPlayer(winner))                              msg = "NOIR GAGNE!";
+    else if (!isBlackPlayer(winner) && (int)winner != 0)   msg = "BLANC GAGNE!";
 
     DrawText(msg, sw / 2 - MeasureText(msg, 60) / 2, sh / 2 - 60, 60, RED);
 

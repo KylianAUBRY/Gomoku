@@ -67,8 +67,13 @@ private:
     // ── Règle endgame capture ─────────────────────────────────────────────────
     // Un alignement de 5 ne gagne que si l'adversaire ne peut pas capturer
     // immédiatement une paire de cet alignement. Si c'est possible, il a un tour.
+    // pending_count_ : 1 = premier pending, ≥ 2 = double-pending
+    //   (just_played gagne s'il a aussi 5 "à son tour").
+    // winner_ : gagnant réel positionné par apply_win_check, lu par le HUD.
     bool   pending_alignment_win_;
     Player pending_winner_;
+    int    pending_count_;
+    Player winner_;
 
     // ── Thread IA (Solo uniquement) ───────────────────────────────────────────
     std::thread          ai_thread_;

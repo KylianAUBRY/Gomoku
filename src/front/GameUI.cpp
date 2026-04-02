@@ -454,15 +454,25 @@ void GameUI::draw_game_over(const GameState &state, UIState ui_state) {
     return;
   }
 
-  // Détermine le gagnant : alignement OU capture de 10 pierres
-  bool black_wins = Rules::check_win_condition(state, Player::BLACK) ||
-                    Rules::check_win_by_capture(state, Player::BLACK);
-  bool white_wins = Rules::check_win_condition(state, Player::WHITE) ||
-                    Rules::check_win_by_capture(state, Player::WHITE);
-
+  // Détermine le gagnant via Input::get_winner() — fiable même quand les deux
+  // joueurs ont 5 pierres simultanément sur le plateau (cas pending + réponse).
+  // Fallback sur la détection par plateau uniquement si get_winner() retourne NONE
+  // (victoire sans pending : le gagnant est l'unique joueur avec 5 ou 10 captures).
+  Player winner = Input::get_winner();
   std::string win_str = "GAME OVER";
-  if (black_wins) win_str = "BLACK WINS!";
-  else if (white_wins) win_str = "WHITE WINS!";
+  if (winner == Player::BLACK) {
+      win_str = "BLACK WINS!";
+  } else if (winner == Player::WHITE) {
+      win_str = "WHITE WINS!";
+  } else {
+      // Fallback (ne devrait pas arriver mais sécurise l'affichage)
+      bool black_wins = Rules::check_win_condition(state, Player::BLACK) ||
+                        Rules::check_win_by_capture(state, Player::BLACK);
+      bool white_wins = Rules::check_win_condition(state, Player::WHITE) ||
+                        Rules::check_win_by_capture(state, Player::WHITE);
+      if (black_wins && !white_wins) win_str = "BLACK WINS!";
+      else if (white_wins)           win_str = "WHITE WINS!";
+  }
 
   sf::RectangleShape overlay(
       sf::Vector2f(window.getSize().x, window.getSize().y));

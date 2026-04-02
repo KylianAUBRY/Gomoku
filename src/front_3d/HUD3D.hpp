@@ -20,7 +20,9 @@ void draw_hud(const GameState& state, UI3DState current_state,
               bool has_hover, int hovered_row, int hovered_col);
 
 // Overlay noir semi-transparent + message de fin + score IA + instruction [R]
-void draw_game_over_overlay(const GameState& state, UI3DState current_state);
+// winner : gagnant réel fourni par GameUI3D::apply_win_check (fiable même quand
+//          les deux joueurs ont 5 pierres simultanément sur le plateau).
+void draw_game_over_overlay(const GameState& state, UI3DState current_state, Player winner);
 
 // Croix X animées aux positions des pierres capturées (GetWorldToScreen)
 void draw_capture_anims_3d(const std::vector<CaptureAnim3D>& anims,

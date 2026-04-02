@@ -105,7 +105,7 @@ GameUI3D::GameUI3D()
       vm_bob_time(0.0f), vm_recoil(0.0f), bolt_anim_timer_(0.0f),
       ai_pending_(false), ai_highlight_row_(-1), ai_highlight_col_(-1),
       ai_highlight_timer_(0.0f),
-      pending_alignment_win_(false), pending_winner_(makePlayerNone()),
+      pending_alignment_win_(false), pending_winner_(makePlayerNone()), pending_count_(0), winner_(makePlayerNone()),
       ai_thread_active_(false), ai_result_ready_(false),
       ai_result_({-1, -1, 0, 0}) {
     InitWindow(1280, 720, "Gomoku FPS");
@@ -304,10 +304,12 @@ void GameUI3D::handle_game_input(GameState& state, Gomoku& gomoku) {
         current_state = UI3DState::MAIN_MENU;
         state.reset();
         init_camera();
-        ai_pending_ = false;
-        bolt_anim_timer_ = 0.0f;
+        ai_pending_            = false;
+        bolt_anim_timer_       = 0.0f;
         pending_alignment_win_ = false;
-        pending_winner_ = makePlayerNone();
+        pending_winner_        = makePlayerNone();
+        pending_count_         = 0;
+        winner_                = makePlayerNone();
         ai_result_ready_.store(false);
         return;
     }
@@ -315,10 +317,12 @@ void GameUI3D::handle_game_input(GameState& state, Gomoku& gomoku) {
     if (state.game_over) {
         if (IsKeyPressed(KEY_R)) {
             state.reset();
-            ai_pending_ = false;
-            bolt_anim_timer_ = 0.0f;
+            ai_pending_            = false;
+            bolt_anim_timer_       = 0.0f;
             pending_alignment_win_ = false;
-            pending_winner_ = makePlayerNone();
+            pending_winner_        = makePlayerNone();
+            pending_count_         = 0;
+            winner_                = makePlayerNone();
             ai_result_ready_.store(false);
         }
         return;
@@ -412,13 +416,18 @@ void GameUI3D::handle_ai_turn(GameState& state, Gomoku& gomoku) {
 // ─────────────────────────────────────────────────────────────────────────────
 // apply_win_check — vérification de victoire avec règle endgame capture
 //
-// Portage fidèle de la logique 2D (Input.cpp::apply_win_check).
+// Portage fidèle de la logique 2D (Input.cpp::apply_win_check) avec les
+// mêmes correctifs : priorité capture + règle double-pending.
 // place_stone() a déjà switché current_player, donc "qui vient de jouer"
 // = l'opposé de current_player.
 //
-// Cas 1 — pending_alignment_win_ actif (l'adversaire avait une chance) :
-//   Si l'alignement est encore intact → le pending_winner_ gagne.
-//   Sinon → annuler le pending et réévaluer.
+// Cas 1 — pending_alignment_win_ actif :
+//   1a. Victoire par capture de just_played → toujours immédiate.
+//   1b. Alignement du pending_winner_ intact :
+//       - Double-pending (pending_count_ ≥ 2) ET just_played a aussi 5
+//         → just_played gagne ("en position de victoire à son tour").
+//       - Sinon → pending_winner_ gagne.
+//   1c. Alignement brisé → flux normal pour just_played.
 //
 // Cas 2 — pas de pending :
 //   a) Victoire par capture : immédiate.
@@ -431,47 +440,81 @@ void GameUI3D::apply_win_check(GameState& state) {
     Player next_player = state.current_player;
 
     if (pending_alignment_win_) {
-        if (Rules::check_win_condition(state, pending_winner_)) {
-            state.game_over = true;
+        // 1a. Victoire par capture : toujours immédiate, même en pending.
+        if (Rules::check_win_by_capture(state, just_played)) {
+            state.game_over            = true;
             state.best_move_suggestion = {-1, -1, 0, 0};
-            pending_alignment_win_ = false;
-            pending_winner_ = makePlayerNone();
+            winner_                    = just_played;
+            pending_alignment_win_     = false;
+            pending_winner_            = makePlayerNone();
+            pending_count_             = 0;
             return;
         }
+
+        // 1b. Alignement du pending_winner_ encore intact ?
+        if (Rules::check_win_condition(state, pending_winner_)) {
+            // Double-pending : just_played a répondu en alignant 5 à son tour → il gagne.
+            if (pending_count_ >= 2 && Rules::check_win_condition(state, just_played)) {
+                state.game_over            = true;
+                state.best_move_suggestion = {-1, -1, 0, 0};
+                winner_                    = just_played;
+                pending_alignment_win_     = false;
+                pending_winner_            = makePlayerNone();
+                pending_count_             = 0;
+                return;
+            }
+            // Cas normal : pending_winner_ gagne.
+            state.game_over            = true;
+            state.best_move_suggestion = {-1, -1, 0, 0};
+            winner_                    = pending_winner_;
+            pending_alignment_win_     = false;
+            pending_winner_            = makePlayerNone();
+            pending_count_             = 0;
+            return;
+        }
+
+        // 1c. Alignement brisé → flux normal pour just_played.
         pending_alignment_win_ = false;
-        pending_winner_ = makePlayerNone();
+        pending_winner_        = makePlayerNone();
+        pending_count_         = 0;
 
         if (Rules::check_win_by_capture(state, just_played)) {
-            state.game_over = true;
+            state.game_over            = true;
             state.best_move_suggestion = {-1, -1, 0, 0};
+            winner_                    = just_played;
             return;
         }
         if (Rules::check_win_condition(state, just_played)) {
             if (!can_opponent_capture_from_alignment(state, just_played, next_player)) {
-                state.game_over = true;
+                state.game_over            = true;
                 state.best_move_suggestion = {-1, -1, 0, 0};
+                winner_                    = just_played;
                 return;
             }
             pending_alignment_win_ = true;
-            pending_winner_ = just_played;
+            pending_winner_        = just_played;
+            pending_count_         = 2;
         }
         return;
     }
 
     if (Rules::check_win_by_capture(state, just_played)) {
-        state.game_over = true;
+        state.game_over            = true;
         state.best_move_suggestion = {-1, -1, 0, 0};
+        winner_                    = just_played;
         return;
     }
 
     if (Rules::check_win_condition(state, just_played)) {
         if (!can_opponent_capture_from_alignment(state, just_played, next_player)) {
-            state.game_over = true;
+            state.game_over            = true;
             state.best_move_suggestion = {-1, -1, 0, 0};
+            winner_                    = just_played;
             return;
         }
         pending_alignment_win_ = true;
-        pending_winner_ = just_played;
+        pending_winner_        = just_played;
+        pending_count_         = 1;
     }
 }
 
@@ -513,7 +556,7 @@ void GameUI3D::render_scene(const GameState& state) {
     draw_capture_anims_3d(capture_anims, camera);
     draw_history(state);
     if (state.game_over)
-        draw_game_over_overlay(state, current_state);
+        draw_game_over_overlay(state, current_state, winner_);
 
     EndDrawing();
 }

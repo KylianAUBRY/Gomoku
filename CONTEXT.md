@@ -114,7 +114,15 @@ SFML et Raylib ne coexistent **jamais** dans le même processus.
 
 ## 8. TODO List actuelle
 
-TODO 1 : dans le solo vs IA du front 2D, il est affiché le temps total que l'ia prend pour réfléchir, mais il faudrait afficher le temps moyen par coup. remplace le .
+TODO 1 : Erreur dans la gestion des captures dans le front. lorsqu'un joueur se trouve a poser 5 pierres, et qu'au moins une de ces est capturable au prochain tour, alors le joueur adverse peut joueru au prochain tour pour capturer les pierres du joueur adverse. 
+
+cette condition merite d'etre amelioré. en effet il est possible de capturer plusieurs ligne ci celles si sont dans l'axe de la capture.
+
+ces fonctionnements sont pertinent et a conserver, mais il faudrait ameliorer la gestion des captures :
+
+Si le joueur qui a posé les 5 pierres, se retrouve toujours en position de victoire a son tour, alors il a gagné. 
+
+En l'etat, si les deux joueurs se retrouvent en "pending" a la suite, c'est le deuxieme joueur qui remporte, alors que le premier joueur aurait du remporter la partie, étant donné qu'il a encore ses 5 pierres.
 
 ---
 

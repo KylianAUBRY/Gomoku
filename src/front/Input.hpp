@@ -29,4 +29,9 @@ void process_events(sf::RenderWindow &window, UIState &current_state,
                     int &menu_selection, GameState &state, Gomoku &gomoku,
                     bool &suggestion_shown);
 
+// Retourne le gagnant réel déterminé par apply_win_check.
+// Toujours fiable même quand les deux joueurs ont 5 simultanément sur le plateau.
+// Retourne Player::NONE si la partie n'est pas terminée ou après un reset.
+Player get_winner();
+
 } // namespace Input
