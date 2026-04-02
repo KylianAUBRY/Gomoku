@@ -110,6 +110,9 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
     uint64_t black_board[BitBoard_SIZE];
     std::memcpy(black_board, board.black, sizeof(board.black));
     std::memcpy(white_board, board.white, sizeof(board.white));
+    int whiteWinBefore = board.whiteWin;
+    int blackWinBefore = board.blackWin;
+    int scoreBefore = board.score;
 
     std::vector<Move> moves = generateMoves(board, player);
     Cell opponent = (player == WHITE) ? BLACK : WHITE;
@@ -166,27 +169,44 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
         best = {-1, -1, std::numeric_limits<int>::min(), 0};
         int legalMoveCount = 0;
         for (Move& move : moves) {
-            int scoreBefore = board.score;
             if (makeMove(board, move, WHITE) == 1)
                 continue ; // coup illégal
             int lmr = legalMoveCount++;
-
             Move eval;
-            if (lmr >= LMR_FULL_DEPTH_MOVES && depthRemaining >= LMR_REDUCTION_LIMIT) {
-                int reduction = 1 + lmr / 6; // réduction adaptative
-                eval = minimax(depth + 1 + reduction, board, opponent, alpha, alpha + 1, gamePhase, true, move.row, move.col);
-                if (eval.score > alpha) // failed high → recherche complète
-                    eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
-            } else {
-                eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
+            // if (board.blackWin > 0 || blackWinBefore > 0)
+            //     printf("test\ntest\ntest\ntest\ntest\ntest\ntest\ntest\ntest\ntest\ntest\ntest\n");
+            if (board.blackWin > 0)
+            {
+                // printf("whitewin");
+                eval = {move.row, move.col, -20000000 + depth, 0}; // defaite immédiate
+                board.score = -20000000 + depth; // pour que les coups suivants soient évalués comme des défaites plus graves
+                // std::memcpy(board.black, black_board, sizeof(black_board));
+                // std::memcpy(board.white, white_board, sizeof(white_board));
+                // board.whiteCaptures = whiteCapturesBefore;
+                // board.blackCaptures = blackCapturesBefore;
+                // board.score = scoreBefore;
+                // board.hash = hashBefore;
+                // board.whiteWin = whiteWinBefore;
+                // board.blackWin = blackWinBefore;
+                // continue ;
             }
-
+                if (lmr >= LMR_FULL_DEPTH_MOVES && depthRemaining >= LMR_REDUCTION_LIMIT) {
+                    int reduction = 1 + lmr / 6; // réduction adaptative
+                    eval = minimax(depth + 1 + reduction, board, opponent, alpha, alpha + 1, gamePhase, true, move.row, move.col);
+                    if (eval.score > alpha) // failed high → recherche complète
+                        eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
+                } else {
+                    eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
+                }
+            
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
             board.blackCaptures = blackCapturesBefore;
             board.score = scoreBefore;
             board.hash = hashBefore;
+            board.whiteWin = whiteWinBefore;
+            board.blackWin = blackWinBefore;
             if (eval.score > best.score) {
                 best = {move.row, move.col, eval.score, 0};
             }
@@ -209,12 +229,27 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
         best = {-1, -1, std::numeric_limits<int>::max(), 0};
         int legalMoveCount = 0;
         for (Move& move : moves) {
-            int scoreBefore = board.score;
             if (makeMove(board, move, BLACK) == 1)
                 continue ; // coup illégal
             int lmr = legalMoveCount++;
-
             Move eval;
+            // if (board.whiteWin > 0 && whiteWinBefore > 0)
+            //     printf("test\ntest\ntest\ntest\ntest\ntest\ntest\ntest\ntest\ntest\ntest\ntest\n");
+            if (board.whiteWin > 0)
+            {
+                // printf("blackwin");
+                eval = {move.row, move.col, 20000000 - depth, 0}; // defaite immédiate
+                board.score = 20000000 - depth; // pour que les coups suivants soient évalués comme des défaites plus graves
+                // std::memcpy(board.black, black_board, sizeof(black_board));
+                // std::memcpy(board.white, white_board, sizeof(white_board));
+                // board.whiteCaptures = whiteCapturesBefore;
+                // board.blackCaptures = blackCapturesBefore;
+                // board.score = scoreBefore;
+                // board.hash = hashBefore;
+                // board.whiteWin = whiteWinBefore;
+                // board.blackWin = blackWinBefore;
+                // continue ;
+            }
             if (lmr >= LMR_FULL_DEPTH_MOVES && depthRemaining >= LMR_REDUCTION_LIMIT) {
                 int reduction = 1 + lmr / 6; // réduction adaptative
                 eval = minimax(depth + 1 + reduction, board, opponent, beta - 1, beta, gamePhase, true, move.row, move.col);
@@ -223,13 +258,15 @@ Move Gomoku::minimax(int depth, BitBoard& board, Cell player, int alpha, int bet
             } else {
                 eval = minimax(depth + 1, board, opponent, alpha, beta, gamePhase, true, move.row, move.col);
             }
-
+            
             std::memcpy(board.black, black_board, sizeof(black_board));
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
             board.blackCaptures = blackCapturesBefore;
             board.score = scoreBefore;
             board.hash = hashBefore;
+            board.whiteWin = whiteWinBefore;
+            board.blackWin = blackWinBefore;
             if (eval.score < best.score) {
                 best = {move.row, move.col, eval.score, 0};
             }
@@ -276,17 +313,13 @@ Move Gomoku::getBestMove(BitBoard& board, Cell player) {
     board.hash = computeFullHash(board) ^ 0xAAAAAAAAAAAAAAAAULL;
 
     clock_gettime(CLOCK_MONOTONIC, &start);
-    printf("board.score : %d\n", board.score);
     Move bestMove = minimax(0, board, player, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), gamePhase);
     clock_gettime(CLOCK_MONOTONIC, &end);
-    if(std::abs(bestMove.score) >= 1000000) {
-        printf("Best move found with score %d, which is a winning move for %s\n", bestMove.score, (bestMove.score > 0) ? "WHITE" : "BLACK");
-        std::vector<Move> moves = generateMoves(board, player);
-        printf("number of legal moves: %lu\n", moves.size());
-    }
+
     double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 +
                    (end.tv_nsec - start.tv_nsec) / 1e6;
-    printf("get_best_move: %.3f ms, move.score : %d, board.score : %d, move.row : %d, move.col : %d\n", elapsed, bestMove.score, board.score, bestMove.row, bestMove.col);
+    printf("get_best_move: %.3f ms, move.score : %d, board.score : %d, move.row : %d, move.col : %d -- ", elapsed, bestMove.score, board.score, bestMove.row, bestMove.col);
+    printf(" %d, %d\n", board.whiteWin, board.blackWin);
     bestMove.computeTimeMs = (long)elapsed;
     return bestMove;
 }

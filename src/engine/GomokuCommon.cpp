@@ -292,23 +292,15 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
                 scoreAfter -= evalTable[code][0];
             }
         } //on enleve le score des pierres à capturer avant de les enlever du board
+        scoreBefore = scoreAfter;
         for (int i = 0; i < removeCount; i++) {
-          board.set(toRemove[i][0], toRemove[i][1], EMPTY);
+            board.set(toRemove[i][0], toRemove[i][1], EMPTY);
         } //on les enleve du board
-
         if (player == WHITE) {
-          scoreAfter += MANUAL_CAPTURE_SCORE * removeCount;
-          board.whiteCaptures += static_cast<uint8_t>(removeCount);
-          if (board.whiteCaptures >= 10)
-            scoreAfter += 5000000;
-          setBit(board.white, pos);
+            setBit(board.white, pos);
         } else {
-          scoreAfter -= MANUAL_CAPTURE_SCORE * removeCount;
-          board.blackCaptures += static_cast<uint8_t>(removeCount);
-          if (board.blackCaptures >= 10)
-            scoreAfter -= 5000000;
-          setBit(board.black, pos);
-        } //on donne des point pour la capture et on pose la pierre qui declanche la capture
+            setBit(board.black, pos);
+        } //on pose la pierre qui declanche la capture
         for (int i = 0; i < removeCount; i++)
         {
             for (int di = 0; di < 4; di++) {
@@ -316,10 +308,69 @@ int makeMove(BitBoard& board, const Move& move, Cell player) {
                 scoreAfter += evalTable[code][0];
             }
         }
+        if (board.score - scoreBefore > 1000000) //victoire blanche sur l'endroit
+        {
+            float diff = static_cast<float>(board.score - scoreAfter);
+            while (diff > 1000000) //tant qu'on enleve des victoir
+            {
+                board.whiteWin -= 1;
+                diff -= 2000000;
+            }
+        }else if (board.score - scoreBefore < -1000000)
+        {
+            float diff = static_cast<float>(board.score - scoreAfter);
+            while (diff < -1000000) //tant qu'on enleve des victoir
+            {
+                board.blackWin -= 1;
+                diff += 2000000;
+            }
+        }
+        scoreBefore = scoreAfter;
         for (int di = 0; di < 4; di++) {
             int dr = dirs[di][0], dc = dirs[di][1];
             int code = computeLineScore(board, move.row, move.col, dr, dc);
             scoreAfter += evalTable[code][0];
+        }
+        if (scoreAfter > 1000000) {
+            for (int tmpScore = scoreAfter - scoreBefore; tmpScore > 1000000; ) {
+                board.whiteWin += 1;
+                tmpScore -= 2000000;
+            }
+        }
+        else if (scoreAfter < -1000000) {
+            for (int tmpScore = scoreAfter - scoreBefore; tmpScore < -1000000; ) {
+                board.blackWin += 1;
+                tmpScore += 2000000;
+            }
+        }
+        if (player == WHITE) {
+            scoreAfter += MANUAL_CAPTURE_SCORE * removeCount;
+            board.whiteCaptures += static_cast<uint8_t>(removeCount);
+            if (board.whiteCaptures >= 10){
+                scoreAfter += 5000000;
+                board.whiteCaptures += 1;
+            }
+        } else {
+            scoreAfter -= MANUAL_CAPTURE_SCORE * removeCount;
+            board.blackCaptures += static_cast<uint8_t>(removeCount);
+            if (board.blackCaptures >= 10) {
+                scoreAfter -= 5000000;
+                board.blackCaptures += 1;
+            }
+        }//on donne des point pour la capture 
+    }
+    else {
+        if (scoreAfter > 1000000) {
+            for (int tmpScore = scoreAfter - scoreBefore; tmpScore > 1000000; ) {
+                board.whiteWin += 1;
+                tmpScore -= 2000000;
+            }
+        }
+        else if (scoreAfter < -1000000) {
+            for (int tmpScore = scoreAfter - scoreBefore; tmpScore < -1000000; ) {
+                board.blackWin += 1;
+                tmpScore += 2000000;
+            }
         }
     }
     board.score = scoreAfter;

@@ -108,6 +108,9 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
     uint64_t hashBefore          = board.hash;
     uint64_t white_board[BitBoard_SIZE];
     uint64_t black_board[BitBoard_SIZE];
+
+    int whiteWinBefore = board.whiteWin;
+    int blackWinBefore = board.blackWin;
     std::memcpy(black_board, board.black, sizeof(board.black));
     std::memcpy(white_board, board.white, sizeof(board.white));
 
@@ -181,6 +184,9 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             std::memcpy(board.white, white_board, sizeof(white_board));
             board.whiteCaptures = whiteCapturesBefore;
             board.blackCaptures = blackCapturesBefore;
+            
+            board.whiteWin = whiteWinBefore;
+            board.blackWin = blackWinBefore;
             board.score = scoreBefore;
             board.hash = hashBefore;
             if (eval.score > best.score) {
@@ -226,6 +232,9 @@ Move Gomoku::minimax2(int depth, BitBoard& board, Cell player, int alpha, int be
             board.blackCaptures = blackCapturesBefore;
             board.score = scoreBefore;
             board.hash = hashBefore;
+
+            board.whiteWin = whiteWinBefore;
+            board.blackWin = blackWinBefore;
             if (eval.score < best.score) {
                 best = {move.row, move.col, eval.score, 0};
             }

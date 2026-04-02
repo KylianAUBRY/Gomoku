@@ -83,6 +83,8 @@ struct BitBoard {
     uint8_t blackCaptures = 0;
     uint8_t whiteCaptures = 0;
     uint64_t hash = 0; // Hash Zobrist incrémental — mis à jour dans apply_move
+    int whiteWin = 0;
+    int blackWin = 0;
 
     // Retourne la cellule à (row, col)
     Cell get(int row, int col) const {
@@ -133,7 +135,6 @@ public:
 
     Move getBestMove(BitBoard& board, Cell player);
     Move getBestMove2(BitBoard& board, Cell player);
-    Move getBestMove3(BitBoard& board, Cell player);
     bool isLegalMove(const BitBoard& board, int row, int col, Cell player);
     
 
