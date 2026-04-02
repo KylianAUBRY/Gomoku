@@ -291,6 +291,21 @@ Move Gomoku::getBestMove(BitBoard& board, Cell player) {
     board.hash = computeFullHash(board) ^ 0xAAAAAAAAAAAAAAAAULL;
 
     clock_gettime(CLOCK_MONOTONIC, &start);
+    if ((player == WHITE && board.score >= 1000000) || (player == BLACK && board.score <= -1000000)) {
+        // Position déjà gagnante pour le joueur actuel : retourner un coup factice
+        printf("ERREUR \nERREUR \nERREUR \n");
+        while (board.score >= 1000000)
+        {
+            board.score -= 1000000;
+        }
+        while (board.score <= -1000000)
+        {
+            while (board.score <= -1000000)
+            {
+                board.score += 1000000;
+            }
+        }
+    }
     Move bestMove = minimax(0, board, player, std::numeric_limits<int>::min(), std::numeric_limits<int>::max(), gamePhase);
     clock_gettime(CLOCK_MONOTONIC, &end);
 
