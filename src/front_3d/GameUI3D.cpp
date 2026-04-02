@@ -431,6 +431,10 @@ void GameUI3D::handle_game_input(GameState &state, Gomoku &gomoku) {
   if (bolt_anim_timer_ > 0.0f)
     return;
 
+  // Bloquer le tir pendant que le thread IA est en cours de réflexion
+  if (ai_thread_active_.load())
+    return;
+
   if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && has_hover) {
     if (Rules::is_valid_move(state, hovered_col, hovered_row)) {
       if (state.place_stone(hovered_col, hovered_row)) {
@@ -846,11 +850,13 @@ void GameUI3D::draw_best_move_3d(const GameState &state) {
   Vector3 pos = boardToWorld(state.best_move_suggestion.row,
                              state.best_move_suggestion.col, 0.05f);
 
-  // Effet de pulsation : alpha oscille en sinusoïde
-  float pulse = (sinf((float)GetTime() * 4.0f) + 1.0f) * 0.5f;
-  unsigned char alpha = (unsigned char)(80 + pulse * 80);
+  // Effet de pulsation rapide : alpha oscille entre 160 et 255 (rouge vif)
+  float pulse = (sinf((float)GetTime() * 8.0f) + 1.0f) * 0.5f;
+  unsigned char alpha = (unsigned char)(160 + pulse * 95);
 
-  DrawCircle3D(pos, 0.5f, {0.0f, 0.0f, 1.0f}, 0.0f, {0, 200, 255, alpha});
+  DrawCircle3D(pos, 0.50f, {0.0f, 0.0f, 1.0f}, 0.0f, {255, 0, 0, alpha});
+  DrawCircle3D(pos, 0.55f, {0.0f, 0.0f, 1.0f}, 0.0f,
+               {255, 60, 60, (unsigned char)(alpha / 2)});
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
