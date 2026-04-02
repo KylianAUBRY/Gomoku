@@ -17,12 +17,3 @@ struct CaptureAnim3D {
     float timer; // Durée de vie décroissante (1.0s → 0.0s)
 };
 
-// Douille éjectée — physique simple dans l'espace viewmodel
-// r/u/f : axes right/up/forward relatifs au grip
-struct ShellCasing {
-    float r, u, f;    // Position offset depuis le grip
-    float vr, vu, vf; // Vitesse initiale
-    float timer;      // Durée de vie (0.7s)
-    float rot;        // Angle de rotation (degrés)
-    float rot_spd;    // Vitesse angulaire (degrés/s)
-};

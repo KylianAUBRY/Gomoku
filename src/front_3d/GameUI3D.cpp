@@ -247,20 +247,6 @@ void GameUI3D::run(GameState& state, Gomoku& gomoku) {
             if (bolt_anim_timer_ > 0.0f) bolt_anim_timer_ -= dt;
             if (bolt_anim_timer_ < 0.0f) bolt_anim_timer_  = 0.0f;
 
-            // Physique des douilles : gravité sur l'axe U
-            for (auto& s : shell_casings_) {
-                s.vu -= 4.0f * dt;
-                s.r  += s.vr * dt;
-                s.u  += s.vu * dt;
-                s.f  += s.vf * dt;
-                s.rot += s.rot_spd * dt;
-                s.timer -= dt;
-            }
-            shell_casings_.erase(
-                std::remove_if(shell_casings_.begin(), shell_casings_.end(),
-                               [](const ShellCasing& s) { return s.timer <= 0.0f; }),
-                shell_casings_.end());
-
             for (auto& a : capture_anims) a.timer -= dt;
             capture_anims.erase(
                 std::remove_if(capture_anims.begin(), capture_anims.end(),
@@ -323,7 +309,6 @@ void GameUI3D::handle_game_input(GameState& state, Gomoku& gomoku) {
         pending_alignment_win_ = false;
         pending_winner_ = makePlayerNone();
         ai_result_ready_.store(false);
-        shell_casings_.clear();
         return;
     }
 
@@ -335,7 +320,6 @@ void GameUI3D::handle_game_input(GameState& state, Gomoku& gomoku) {
             pending_alignment_win_ = false;
             pending_winner_ = makePlayerNone();
             ai_result_ready_.store(false);
-            shell_casings_.clear();
         }
         return;
     }
@@ -358,13 +342,6 @@ void GameUI3D::handle_game_input(GameState& state, Gomoku& gomoku) {
                 // Animations de tir
                 vm_recoil        = 1.0f;
                 bolt_anim_timer_ = BOLT_ANIM_DURATION;
-
-                // Éjecter une douille
-                ShellCasing s;
-                s.r = -0.02f; s.u = 0.03f;  s.f = 0.05f;
-                s.vr = -0.40f; s.vu = 0.35f; s.vf = -0.10f;
-                s.timer = 0.70f; s.rot = 0.0f; s.rot_spd = 600.0f;
-                shell_casings_.push_back(s);
 
                 apply_win_check(state);
 
@@ -527,7 +504,7 @@ void GameUI3D::render_scene(const GameState& state) {
 
     // ── Pass 2 : viewmodel ───────────────────────────────────────────────────
     draw_viewmodel_3d(camera, vm_bob_time, vm_recoil, bolt_anim_timer_,
-                      shell_casings_);
+                      isBlackPlayer(state.current_player));
 
     // ── Pass 3 : HUD 2D ───────────────────────────────────────────────────────
     rlDisableDepthTest();

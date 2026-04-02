@@ -55,7 +55,6 @@ private:
     float vm_recoil;      // Intensité du recul [0..1], décroît à 6× dt
     float bolt_anim_timer_; // Durée restante animation bolt-action
 
-    std::vector<ShellCasing>    shell_casings_;
     std::vector<CaptureAnim3D>  capture_anims;
 
     // ── Tour IA — cooldown + surbrillance ─────────────────────────────────────
