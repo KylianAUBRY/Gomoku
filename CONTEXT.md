@@ -87,10 +87,14 @@ SFML et Raylib ne coexistent **jamais** dans le même processus.
 
 ## 8. TODO List actuelle
 
+TODO 1 : Refacto massif du front 3D. repartir le code dans plusieur fichier hpp et cpp de maniere coherente, structé et humainement comprehensible. ATTENTION : le code doit rester fonctionnel comme en l'état.
+
 TODO 2 : Fix le manquement aux Endgame capture absent en 3D. Dans le mode 2D, la condition de victoire "pending" est implémentée, mais pas en 3D. il faut l'ajouter. cette condition empeche le joeur qui a 5 piere, dont une au moins capturable sur cette rangée. il faut s'inspterer de la regle implémenté en 2D.
 si beosin de plus de precision ou manquement de clarté dans cette tache, me demander au préalable.
 
 TODO 3 : Gestion multithread du mode 3D FPS. En l'etat, lorsque l'IA cherche le best move, le jeux freeze en attendant. il faut pouvoir laisser le joueur bouger la camera, meme si l'ia est en train de chercher le best move. 
+
+
 ---
 
 ## 9. Décisions d'architecture enregistrées (ADR)

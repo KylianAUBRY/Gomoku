@@ -15,6 +15,9 @@ SRCS = src/main.cpp \
        src/front/GameUI.cpp \
        src/front/Input.cpp \
        src/front_3d/GameUI3D.cpp \
+       src/front_3d/Board3D.cpp \
+       src/front_3d/Viewmodel3D.cpp \
+       src/front_3d/HUD3D.cpp \
        src/engine/Rules.cpp \
        src/engine/GomokuCommon.cpp \
        src/engine/GomokuMinimax.cpp \
