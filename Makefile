@@ -5,7 +5,8 @@ CXXFLAGS = -Wall -Wextra -Werror -Wno-missing-field-initializers -std=c++17 -O3
 # Include & libraries (assuming homebrew standard location for SFML on mac)
 # If SFML is installed differently, paths will need adjustment.
 INCLUDES = -I/opt/homebrew/include -I./src
-LIBS = -L/opt/homebrew/lib -lraylib -lsfml-graphics -lsfml-window -lsfml-system
+LIBS = -L/opt/homebrew/lib -lraylib -lsfml-graphics -lsfml-window -lsfml-system \
+       -framework OpenGL
 
 # Binary
 NAME = Gomoku

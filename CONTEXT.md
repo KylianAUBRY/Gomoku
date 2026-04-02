@@ -1,7 +1,7 @@
 # CONTEXT — Projet Gomoku (42 School)
 
 > Pré-prompt à lire en début de chaque session de travail.
-> Mis à jour : 2026-03-31
+> Mis à jour : 2026-04-02
 
 ---
 
@@ -41,7 +41,7 @@
 src/
 ├── main.cpp              # Point d'entrée, branchement 2D / 3D selon args
 ├── engine/               # INTOUCHABLE — moteur partagé
-│   ├── Gomoku.hpp/cpp    # Orchestrateur IA (getBestMove3)
+│   ├── Gomoku.hpp/cpp    # Orchestrateur IA (getBestMove)
 │   ├── GameState.hpp     # État du plateau
 │   ├── Bitboard.hpp      # Représentation bitboard
 │   ├── Rules.hpp/cpp     # Validation des règles
@@ -50,8 +50,35 @@ src/
 │   ├── GameUI.hpp/cpp    # Boucle de rendu 2D + HUD
 │   └── Input.hpp/cpp     # Gestion clavier/souris 2D
 └── front_3d/             # Zone de travail — vue 3D Raylib
-    └── GameUI3D.hpp/cpp  # Boucle de rendu 3D + HUD overlay
+    ├── front3d_types.hpp # Types partagés (UI3DState, CaptureAnim3D)
+    │                     #   — N'inclut ni engine ni raylib, ordre-libre
+    ├── front3d_compat.hpp# Helpers Player/Cell + boardToWorld()
+    │                     #   — Résout le conflit macro Raylib BLACK/WHITE vs enum Cell
+    ├── GameUI3D.hpp/cpp  # Orchestrateur : boucle run(), caméra FPS, input,
+    │                     #   thread IA, apply_win_check, pipeline 3 passes
+    ├── Board3D.hpp/cpp   # Goban 3D : plateau, grille, hoshi, pierres,
+    │                     #   raycast, hover, surbrillance IA, best-move
+    ├── HUD3D.hpp/cpp     # HUD overlay 2D : réticule, barre de statut,
+    │                     #   historique des coups, captures animées, game-over
+    └── Viewmodel3D.hpp/cpp # Arme FPS : balancement idle, recul, bolt-action
 ```
+
+### Pipeline de rendu 3 passes (render_scene)
+
+| Passe | Contexte | Contenu |
+|-------|----------|---------|
+| 1 — Scène monde | `BeginMode3D` / `EndMode3D` | Goban, pierres, hover, highlights |
+| 2 — Viewmodel   | Espace caméra virtuel séparé | Arme FPS (`draw_viewmodel_3d`) |
+| 3 — HUD 2D      | Après `rlDisableDepthTest()` | Réticule, statut, historique, game-over |
+
+### Résolution du conflit de macros Raylib / engine
+
+Raylib définit `BLACK` et `WHITE` comme `Color{}` C-style ; l'engine les utilise
+comme valeurs de `enum Cell`. Dans chaque `.cpp` du module front_3d :
+1. Inclure `GameState.hpp` en premier.
+2. Sauvegarder : `static constexpr Cell kBlack = BLACK;` (× 3).
+3. Inclure `raylib.h` (écrase les macros).
+4. Inclure `front3d_compat.hpp` (n'utilise que `static_cast<Cell>`, pas les macros).
 
 **Règle absolue** : `src/engine/` et `src/front/` ne sont **jamais modifiés** pour ajouter du 3D.
 SFML et Raylib ne coexistent **jamais** dans le même processus.
@@ -87,7 +114,7 @@ SFML et Raylib ne coexistent **jamais** dans le même processus.
 
 ## 8. TODO List actuelle
 
-TODO 1 : Refacto du visuel de l'arme a feu. definir le scope de possibilité avec claude. chercher un design simple mai percutant.
+TODO 1 : ameliorer le visuel de l'arme a feu.
 
 ---
 
@@ -108,6 +135,9 @@ TODO 1 : Refacto du visuel de l'arme a feu. definir le scope de possibilité ave
 | ADR-3D-006 | Dossier dédié `src/front_3d/`, aucun fichier 2D touché |
 | ADR-3D-007 | Thread IA séparé, même pattern que le 2D |
 | ADR-3D-008 | HUD en overlay 2D via `DrawText` Raylib après `EndMode3D()` |
+| ADR-3D-009 | front_3d éclaté en 4 sous-modules (Board3D, HUD3D, Viewmodel3D, GameUI3D) + 2 headers partagés (front3d_types.hpp, front3d_compat.hpp) |
+| ADR-3D-010 | Conflit macro Raylib/engine résolu par sauvegarde kBlack/kWhite/kEmpty avant inclusion raylib.h ; helpers dans front3d_compat.hpp |
+| ADR-3D-011 | Viewmodel rendu dans un espace caméra virtuel séparé (indépendant de la scène monde) pour garantir l'arme toujours visible |
 
 ---
 
