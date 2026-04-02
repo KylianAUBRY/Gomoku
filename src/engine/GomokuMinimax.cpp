@@ -293,7 +293,6 @@ Move Gomoku::getBestMove(BitBoard& board, Cell player) {
     clock_gettime(CLOCK_MONOTONIC, &start);
     if ((player == WHITE && board.score >= 1000000) || (player == BLACK && board.score <= -1000000)) {
         // Position déjà gagnante pour le joueur actuel : retourner un coup factice
-        printf("ERREUR \nERREUR \nERREUR \n");
         while (board.score >= 1000000)
         {
             board.score -= 1000000;
