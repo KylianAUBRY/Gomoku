@@ -61,6 +61,7 @@ GameUI3D::GameUI3D()
       ai_highlight_row_(-1), ai_highlight_col_(-1), ai_highlight_timer_(0.0f) {
     InitWindow(1280, 720, "Gomoku FPS");
     ClearWindowState(FLAG_WINDOW_RESIZABLE);
+    SetExitKey(KEY_NULL); // Désactive le comportement Raylib par défaut (ESC = WindowShouldClose)
     SetTargetFPS(60);
     init_camera();
 }

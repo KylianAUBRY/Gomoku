@@ -87,13 +87,12 @@ SFML et Raylib ne coexistent **jamais** dans le même processus.
 
 ## 8. TODO List actuelle
 
-### apprentissage
+TODO 1 : Front 3D. Retour au menu principal. quando n appui sur echap
 
-TODO : LE but est de totalement maitriser la partie technique utilisée pour le front, qu'il s'agisse du 2D ou du 3D. Chaque formules, chaque techno, et tout ce qui se trouve dans le code doit etre parfaitement compris. en se referant au sujet via @en.subject.pdf, se préparer a toute eventualité pour la soutenance du projet.
+TODO 2 : Fix le manquement aux Endgame capture absent en 3D. Dans le mode 2D, la condition de victoire "pending" est implémentée, mais pas en 3D. il faut l'ajouter. cette condition empeche le joeur qui a 5 piere, dont une au moins capturable sur cette rangée. il faut s'inspterer de la regle implémenté en 2D.
+si beosin de plus de precision ou manquement de clarté dans cette tache, me demander au préalable.
 
-Rappel : je dois defendre la partie front, pas le moteur IA. Je dois donc etre capable de repondre a toute question concernant le front, et de justifier chaque choix technique.
-
-Objectif : tout apprendre en une nuit.
+TODO 3 : Gestion multithread du mode 3D FPS. En l'etat, lorsque l'IA cherche le best move, le jeux freeze en attendant. il faut pouvoir laisser le joueur bouger la camera, meme si l'ia est en train de chercher le best move. 
 ---
 
 ## 9. Décisions d'architecture enregistrées (ADR)
