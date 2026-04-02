@@ -114,7 +114,7 @@ SFML et Raylib ne coexistent **jamais** dans le même processus.
 
 ## 8. TODO List actuelle
 
-TODO 1 : ameliorer le visuel de l'arme a feu.
+TODO 1 : dans le solo vs IA du front 2D, il est affiché le temps total que l'ia prend pour réfléchir, mais il faudrait afficher le temps moyen par coup. remplace le .
 
 ---
 

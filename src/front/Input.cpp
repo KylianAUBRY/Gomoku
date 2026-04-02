@@ -618,6 +618,10 @@ void process_events(sf::RenderWindow &window, UIState &current_state,
 
       // Stocker le temps pour l'affichage HUD (exigence sujet p.6)
       state.last_ai_move_time_ms = (double)ai_move.computeTimeMs;
+      // Moyenne mobile incrémentale du temps IA (slot white réutilisé)
+      state.white_move_count++;
+      state.white_avg_time_ms +=
+          (state.last_ai_move_time_ms - state.white_avg_time_ms) / state.white_move_count;
 
       state.place_stone(ai_move.col, ai_move.row);
       apply_win_check(state);

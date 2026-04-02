@@ -330,8 +330,11 @@ void GameUI::draw_hud(const GameState &state) {
   // Valeur = ai_move.computeTimeMs (champ rempli par le moteur, en ms).
   if (current_state == UIState::PLAYING_SOLO) {
     char buffer[64];
-    snprintf(buffer, sizeof(buffer), "AI Time: %.2f ms",
-             state.last_ai_move_time_ms);
+    if (state.white_move_count > 0)
+      snprintf(buffer, sizeof(buffer), "AI Time (avg): %.2f ms",
+               state.white_avg_time_ms);
+    else
+      snprintf(buffer, sizeof(buffer), "AI Time (avg): --");
     sf::Text timer_text(font, buffer, 18);
     timer_text.setFillColor(sf::Color::Cyan);
     timer_text.setPosition({20.0f, hud_y + 55.0f});
