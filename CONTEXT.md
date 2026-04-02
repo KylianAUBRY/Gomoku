@@ -87,8 +87,6 @@ SFML et Raylib ne coexistent **jamais** dans le même processus.
 
 ## 8. TODO List actuelle
 
-TODO 1 : Front 3D. Retour au menu principal. quando n appui sur echap
-
 TODO 2 : Fix le manquement aux Endgame capture absent en 3D. Dans le mode 2D, la condition de victoire "pending" est implémentée, mais pas en 3D. il faut l'ajouter. cette condition empeche le joeur qui a 5 piere, dont une au moins capturable sur cette rangée. il faut s'inspterer de la regle implémenté en 2D.
 si beosin de plus de precision ou manquement de clarté dans cette tache, me demander au préalable.
 
