@@ -271,6 +271,9 @@ int main(int argc, char** argv) {
 #ifndef NO_3D
   if (use_fps) {
     GameUI3D ui;
+    // --fps --bot : démo autonome IA vs IA avec caméra automatique
+    if (start_state == UIState::PLAYING_BOT)
+      ui.enableAutoPlay();
     ui.run(state, game);
     return 0;
   }

@@ -30,6 +30,11 @@ public:
 
     void run(GameState& state, Gomoku& gomoku);
 
+    // Mode démo autonome : les deux camps sont joués par l'IA et la caméra
+    // balaye automatiquement la scène (aucune entrée clavier/souris requise).
+    // Activé par : ./Gomoku --fps --bot
+    void enableAutoPlay() { auto_play_ = true; }
+
 private:
     // ── Caméra ────────────────────────────────────────────────────────────────
     Camera3D camera;
@@ -84,6 +89,10 @@ private:
     // ── Méthodes privées ──────────────────────────────────────────────────────
     void init_camera();
     void update_camera_rotation();
+    void update_camera_auto();     // Orbite automatique (mode démo)
+
+    // ── Mode démo autonome (IA vs IA) ─────────────────────────────────────────
+    bool auto_play_ = false;
 
     void render_menu();
     void handle_menu_input();

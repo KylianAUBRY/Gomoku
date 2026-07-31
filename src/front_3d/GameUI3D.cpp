@@ -173,6 +173,29 @@ void GameUI3D::update_camera_rotation() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// update_camera_auto — orbite automatique pour le mode démo (IA vs IA)
+//
+// Fait varier lentement yaw/pitch avec deux sinusoïdes déphasées, dans les mêmes
+// limites que la rotation manuelle, pour montrer le goban sous différents angles
+// sans aucune entrée souris.
+// ─────────────────────────────────────────────────────────────────────────────
+void GameUI3D::update_camera_auto() {
+    cam_yaw   = CAM_YAW_LIMIT   * 0.65f * sinf(vm_bob_time * 0.25f);
+    cam_pitch = CAM_PITCH_LIMIT * 0.55f * sinf(vm_bob_time * 0.17f + 1.0f);
+
+    Vector3 forward;
+    forward.x = sinf(cam_yaw)  * cosf(cam_pitch);
+    forward.y = sinf(cam_pitch);
+    forward.z = -cosf(cam_yaw) * cosf(cam_pitch);
+
+    camera.position = {9.0f, 9.0f, 22.0f};
+    camera.target   = {camera.position.x + forward.x,
+                       camera.position.y + forward.y,
+                       camera.position.z + forward.z};
+    camera.up       = {0.0f, 1.0f, 0.0f};
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // run — boucle principale 3D
 //
 // DisableCursor() : capture la souris dans la fenêtre (FPS standard).
@@ -184,12 +207,17 @@ void GameUI3D::run(GameState& state, Gomoku& gomoku) {
     DisableCursor();
     HideCursor();
 
+    // Mode démo : on saute le menu et on démarre directement une partie IA vs IA.
+    if (auto_play_)
+        current_state = UI3DState::PLAYING_MULTI;
+
     while (!WindowShouldClose() && running) {
         if (current_state == UI3DState::MAIN_MENU) {
             handle_menu_input();
             render_menu();
         } else {
-            update_camera_rotation();
+            if (auto_play_) update_camera_auto();
+            else            update_camera_rotation();
             has_hover = board3d_raycast(camera, hovered_row, hovered_col);
 
             // Snapshot avant input pour détecter les captures
@@ -198,6 +226,27 @@ void GameUI3D::run(GameState& state, Gomoku& gomoku) {
             BitBoard board_snap   = state.board;
 
             handle_game_input(state, gomoku);
+
+            // ── Mode démo : un coup IA par cycle d'animation bolt-action ────────
+            // Noir → getBestMove2, Blanc → getBestMove (comme le Bot vs Bot 2D).
+            // Espacé par bolt_anim_timer_ pour rester regardable et laisser jouer
+            // l'animation de tir / le recul de l'arme.
+            if (auto_play_ && !state.game_over && bolt_anim_timer_ <= 0.0f) {
+                Cell c = playerToCell(state.current_player);
+                Move m = isBlackPlayer(state.current_player)
+                             ? gomoku.getBestMove2(state.board, c)
+                             : gomoku.getBestMove(state.board, c);
+                if (m.row >= 0 && m.col >= 0 &&
+                    Rules::is_valid_move(state, m.col, m.row) &&
+                    state.place_stone(m.col, m.row)) {
+                    vm_recoil           = 1.0f;
+                    bolt_anim_timer_    = BOLT_ANIM_DURATION;
+                    ai_highlight_row_   = m.row;
+                    ai_highlight_col_   = m.col;
+                    ai_highlight_timer_ = 0.5f;
+                    apply_win_check(state);
+                }
+            }
 
             // Cooldown IA 500ms → lance le thread après expiration
             if (current_state == UI3DState::PLAYING_SOLO &&
