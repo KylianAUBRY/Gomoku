@@ -1,7 +1,9 @@
 #include "engine/GameState.hpp"
 #include "engine/Gomoku.hpp"
 #include "front/GameUI.hpp"
+#ifndef NO_3D
 #include "front_3d/GameUI3D.hpp"
+#endif
 #include <stdio.h>
 #include <time.h>
 #include <string>
@@ -245,9 +247,19 @@ void initEvalTable() {
 
 int main(int argc, char** argv) {
   bool use_fps = false;
+  UIState start_state = UIState::MAIN_MENU;
   for (int i = 1; i < argc; ++i) {
-    if (std::string(argv[i]) == "--fps") {
+    std::string arg = argv[i];
+    if (arg == "--fps") {
       use_fps = true;
+    } else if (arg == "--bot") {
+      start_state = UIState::PLAYING_BOT;      // Démarre directement en Bot vs Bot
+    } else if (arg == "--benchmark") {
+      start_state = UIState::PLAYING_BENCHMARK; // Démarre directement en Benchmark
+    } else if (arg == "--solo") {
+      start_state = UIState::PLAYING_SOLO;
+    } else if (arg == "--multi") {
+      start_state = UIState::PLAYING_MULTI;
     }
   }
 
@@ -256,13 +268,19 @@ int main(int argc, char** argv) {
   Gomoku game;
   GameState state;
 
+#ifndef NO_3D
   if (use_fps) {
     GameUI3D ui;
     ui.run(state, game);
-  } else {
-    GameUI ui;
-    ui.run(state, game);
+    return 0;
   }
+#else
+  (void)use_fps;
+#endif
+
+  GameUI ui;
+  ui.getCurrentState() = start_state; // Saute le menu si un mode a été demandé en CLI
+  ui.run(state, game);
 
   return 0;
 }
